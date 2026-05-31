@@ -1,17 +1,29 @@
-//
-//  gulpApp.swift
-//  gulp
-//
-//  Created by Shitosh Parajuli on 5/31/26.
-//
-
 import SwiftUI
+import GoogleSignIn
 
 @main
 struct gulpApp: App {
+    @State private var auth = AuthViewModel()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Group {
+                if auth.isSignedIn {
+                    VStack(spacing: 16) {
+                        Text("Signed in as \(auth.username)")
+                            .font(.headline)
+                        Button("Sign Out") {
+                            Task { await auth.signOut() }
+                        }
+                        .foregroundStyle(.red)
+                    }
+                } else {
+                    LoginView(auth: auth)
+                }
+            }
+            .onOpenURL { url in
+                GIDSignIn.sharedInstance.handle(url)
+            }
         }
     }
 }
