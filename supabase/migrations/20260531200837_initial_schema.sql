@@ -1,0 +1,3 @@
+-- Schema already applied via Supabase dashboard.
+-- To populate this file: open Docker Desktop, then run:
+--   supabase db pull --schema public
