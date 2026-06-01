@@ -39,19 +39,17 @@ struct LoginView: View {
                             .padding(.horizontal, 24)
                     }
 
-                    Button { Task { await auth.signInWithGoogle() } } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "g.circle.fill")
-                                .font(.system(size: 18, weight: .semibold))
-                            Text("Continue with Google")
-                                .font(.system(size: 16, weight: .semibold))
-                        }
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    GoogleSignInButton(
+                        viewModel: GoogleSignInButtonViewModel(
+                            scheme: .light,
+                            style: .wide,
+                            state: .normal
+                        )
+                    ) {
+                        Task { await auth.signInWithGoogle() }
                     }
+                    .frame(height: 52)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .padding(.horizontal, 24)
                 }
                 .padding(.bottom, 56)
