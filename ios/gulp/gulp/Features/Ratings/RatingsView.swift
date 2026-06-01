@@ -20,14 +20,15 @@ struct RatingsView: View {
                     } else if viewModel.groups.isEmpty {
                         emptyState
                     } else {
-                        LazyVStack(spacing: 14) {
+                        LazyVStack(spacing: 18) {
                             ForEach(viewModel.groups) { group in
                                 RestaurantCard(group: group) { rating in
                                     selectedRating = rating
                                 }
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 18)
+                        .padding(.top, 4)
                         .padding(.bottom, 40)
                     }
                 }
@@ -144,12 +145,7 @@ struct RestaurantCard: View {
                 }
             }
         }
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Theme.hairline, lineWidth: 1)
-        }
+        .elevatedCard(cornerRadius: 20)
     }
 
     private var header: some View {
