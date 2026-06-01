@@ -5,91 +5,120 @@ struct DishDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        ZStack {
+            Theme.background.ignoresSafeArea()
+
             ScrollView {
-                VStack(spacing: 28) {
+                VStack(spacing: 36) {
+                    handle
                     scoreHero
                     dishInfo
                     if let notes = rating.notes, !notes.isEmpty {
-                        notesSection(notes)
+                        notesCard(notes)
                     }
-                    dateRow
+                    metaRow
+                    Spacer(minLength: 24)
                 }
-                .padding(24)
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
-                }
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
             }
         }
+        .preferredColorScheme(.dark)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.hidden)
+        .presentationBackground(Theme.background)
+    }
+
+    private var handle: some View {
+        Capsule()
+            .fill(Theme.textTertiary)
+            .frame(width: 36, height: 4)
+            .padding(.bottom, 8)
     }
 
     private var scoreHero: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             if let score = rating.score {
                 Text("\(score)")
-                    .font(.system(size: 80, weight: .bold, design: .rounded))
-                    .foregroundStyle(scoreColor(Double(score)))
-                Text("out of 10")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 120, weight: .bold, design: .rounded))
+                    .foregroundStyle(scoreGradient(Double(score)))
+                    .shadow(color: scoreColor(Double(score)).opacity(0.4), radius: 30, x: 0, y: 0)
+                Text("OUT OF 10")
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(1.5)
+                    .foregroundStyle(Theme.textTertiary)
             } else {
                 Text("—")
-                    .font(.system(size: 80, weight: .bold, design: .rounded))
-                    .foregroundStyle(.tertiary)
-                Text("not scored")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 120, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.textTertiary)
+                Text("NOT SCORED")
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(1.5)
+                    .foregroundStyle(Theme.textTertiary)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
     }
 
     private var dishInfo: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(spacing: 8) {
             Text(rating.dish.displayName)
-                .font(.title2.bold())
-            Text(rating.dish.restaurant.name)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            if let cuisine = rating.dish.cuisine {
-                Text(cuisine)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Theme.textPrimary)
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 8) {
+                Text(rating.dish.restaurant.name.uppercased())
+                    .font(.system(size: 12, weight: .semibold))
+                    .tracking(1.0)
+                    .foregroundStyle(Theme.textSecondary)
+                if let cuisine = rating.dish.cuisine {
+                    Circle()
+                        .fill(Theme.textTertiary)
+                        .frame(width: 3, height: 3)
+                    Text(cuisine)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.textTertiary)
+                }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
     }
 
-    private func notesSection(_ notes: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("NOTES")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .tracking(0.8)
+    private func notesCard(_ notes: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "quote.opening")
+                    .font(.system(size: 10, weight: .bold))
+                Text("NOTES")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(1.2)
+            }
+            .foregroundStyle(Theme.textTertiary)
+
             Text(notes)
-                .font(.body)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(Theme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(20)
+        .background(Theme.surface)
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Theme.hairline, lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private var dateRow: some View {
+    private var metaRow: some View {
         HStack(spacing: 6) {
             Image(systemName: "calendar")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 11, weight: .medium))
             Text(rating.createdAt.formatted(date: .long, time: .omitted))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 12, weight: .medium))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .foregroundStyle(Theme.textTertiary)
+        .frame(maxWidth: .infinity)
     }
 }
