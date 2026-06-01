@@ -16,12 +16,12 @@ enum Theme {
 
 func scoreColor(_ score: Double) -> Color {
     switch score {
-    case 9.0...:  return Color(red: 0.96, green: 0.87, blue: 0.62)
-    case 8.0..<9: return Color(red: 0.88, green: 0.73, blue: 0.45)
-    case 7.0..<8: return Color(red: 0.80, green: 0.60, blue: 0.38)
-    case 6.0..<7: return Color(red: 0.72, green: 0.50, blue: 0.36)
-    case 5.0..<6: return Color(red: 0.65, green: 0.42, blue: 0.38)
-    default:      return Color(red: 0.58, green: 0.32, blue: 0.36)
+    case 9.0...:  return Color(red: 0.52, green: 0.78, blue: 0.55)
+    case 8.0..<9: return Color(red: 0.72, green: 0.80, blue: 0.45)
+    case 7.0..<8: return Color(red: 0.88, green: 0.72, blue: 0.36)
+    case 6.0..<7: return Color(red: 0.88, green: 0.58, blue: 0.30)
+    case 5.0..<6: return Color(red: 0.85, green: 0.45, blue: 0.32)
+    default:      return Color(red: 0.74, green: 0.34, blue: 0.38)
     }
 }
 

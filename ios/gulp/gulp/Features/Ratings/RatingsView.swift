@@ -150,12 +150,24 @@ struct RestaurantCard: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(group.restaurant.name.uppercased())
                     .font(.system(size: 17, weight: .bold))
                     .tracking(0.5)
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
+
+                if let address = group.restaurant.address {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.accent.opacity(0.85))
+                        Text(address)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
 
                 HStack(spacing: 8) {
                     if let cuisine = primaryCuisine {
