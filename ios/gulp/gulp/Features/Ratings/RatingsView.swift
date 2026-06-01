@@ -58,22 +58,11 @@ struct RatingsView: View {
     private var statLine: some View {
         let dishCount = viewModel.groups.reduce(0) { $0 + $1.ratings.count }
         let placeCount = viewModel.groups.count
-        let allScores = viewModel.groups.flatMap { $0.ratings.compactMap(\.score) }
-        let avg = allScores.isEmpty ? 0 : Double(allScores.reduce(0, +)) / Double(allScores.count)
 
         return HStack(spacing: 14) {
-            statChip(value: "\(dishCount)", label: "dishes")
+            statChip(value: "\(dishCount)", label: dishCount == 1 ? "dish" : "dishes")
             dot
             statChip(value: "\(placeCount)", label: placeCount == 1 ? "place" : "places")
-            dot
-            HStack(spacing: 6) {
-                Text(String(format: "%.1f", avg))
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(scoreColor(avg))
-                Text("avg")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Theme.textTertiary)
-            }
         }
     }
 
