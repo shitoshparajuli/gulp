@@ -1,21 +1,21 @@
 import SwiftUI
 
 enum AppTab {
-    case ratings, profile
+    case home, profile
 }
 
 struct AppRoot: View {
     @Bindable var auth: AuthViewModel
-    @State private var selectedTab: AppTab = .ratings
+    @State private var selectedTab: AppTab = .home
     @State private var showAdd = false
-    @State private var ratingsVersion = 0
+    @State private var contentVersion = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
             Group {
                 switch selectedTab {
-                case .ratings: RatingsView(refreshTrigger: ratingsVersion)
-                case .profile: ProfileView(auth: auth)
+                case .home: HomeView(refreshTrigger: contentVersion)
+                case .profile: ProfileView(auth: auth, refreshTrigger: contentVersion)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -27,7 +27,7 @@ struct AppRoot: View {
         }
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showAdd, onDismiss: {
-            ratingsVersion &+= 1
+            contentVersion &+= 1
         }) {
             AddRatingView()
         }
@@ -39,23 +39,18 @@ struct CustomTabBar: View {
     let onAddTap: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            tabButton(.ratings, icon: "star.fill", label: "Ratings")
-            addButton
-            tabButton(.profile, icon: "person.fill", label: "Profile")
+        GlassEffectContainer(spacing: 20) {
+            HStack(spacing: 0) {
+                tabButton(.home, icon: "house.fill", label: "Home")
+                addButton
+                tabButton(.profile, icon: "person.fill", label: "Profile")
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+            .glassEffect(.regular, in: Rectangle())
+            .ignoresSafeArea(edges: .bottom)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
-        .background(
-            Theme.background
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Theme.hairline)
-                        .frame(height: 1)
-                }
-                .ignoresSafeArea(edges: .bottom)
-        )
     }
 
     private var addButton: some View {
@@ -64,14 +59,10 @@ struct CustomTabBar: View {
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 54, height: 54)
-                .background(
-                    LinearGradient(
-                        colors: [Theme.accent, Theme.accent.opacity(0.78)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+                .glassEffect(
+                    .regular.tint(Theme.accent).interactive(),
+                    in: Circle()
                 )
-                .clipShape(Circle())
                 .shadow(color: Theme.accent.opacity(0.45), radius: 14, x: 0, y: 6)
         }
         .frame(maxWidth: .infinity)

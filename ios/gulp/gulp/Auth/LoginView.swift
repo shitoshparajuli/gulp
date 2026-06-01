@@ -1,5 +1,5 @@
 import SwiftUI
-import GoogleSignInSwift
+import GoogleSignIn
 
 struct LoginView: View {
     @Bindable var auth: AuthViewModel
@@ -39,17 +39,19 @@ struct LoginView: View {
                             .padding(.horizontal, 24)
                     }
 
-                    GoogleSignInButton(
-                        viewModel: GoogleSignInButtonViewModel(
-                            scheme: .light,
-                            style: .wide,
-                            state: .normal
-                        )
-                    ) {
-                        Task { await auth.signInWithGoogle() }
+                    Button { Task { await auth.signInWithGoogle() } } label: {
+                        HStack(spacing: 10) {
+                            GoogleGLogo()
+                                .frame(width: 18, height: 18)
+                            Text("Continue with Google")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    .frame(height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .padding(.horizontal, 24)
                 }
                 .padding(.bottom, 56)
@@ -57,4 +59,29 @@ struct LoginView: View {
         }
         .preferredColorScheme(.dark)
     }
+}
+
+private struct GoogleGLogo: View {
+    var body: some View {
+        if let image = Self.image {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+        }
+    }
+
+    private static let image: UIImage? = {
+        let sdkBundle = Bundle(for: GIDSignIn.self)
+        if let path = sdkBundle.path(forResource: "GoogleSignIn_GoogleSignIn", ofType: "bundle"),
+           let resourceBundle = Bundle(path: path),
+           let img = UIImage(named: "google", in: resourceBundle, compatibleWith: nil) {
+            return img
+        }
+        if let mainPath = Bundle.main.path(forResource: "GoogleSignIn_GoogleSignIn", ofType: "bundle"),
+           let resourceBundle = Bundle(path: mainPath),
+           let img = UIImage(named: "google", in: resourceBundle, compatibleWith: nil) {
+            return img
+        }
+        return UIImage(named: "google", in: sdkBundle, compatibleWith: nil)
+    }()
 }

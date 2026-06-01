@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RatingsView: View {
     var refreshTrigger: Int = 0
+    var topAccessory: AnyView? = nil
     @State private var viewModel = RatingsViewModel()
     @State private var selectedRating: RatingResponse?
     @State private var editingRating: RatingResponse?
@@ -14,6 +15,10 @@ struct RatingsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    if let topAccessory {
+                        topAccessory
+                    }
+
                     header
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
