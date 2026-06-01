@@ -8,7 +8,7 @@ enum Theme {
     static let textPrimary = Color.white
     static let textSecondary = Color.white.opacity(0.6)
     static let textTertiary = Color.white.opacity(0.35)
-    static let accent = Color(red: 0.96, green: 0.42, blue: 0.27)
+    static let accent = Color(red: 0.90, green: 0.27, blue: 0.19)
 
     static let cardTop = Color(red: 0.135, green: 0.135, blue: 0.155)
     static let cardBottom = Color(red: 0.085, green: 0.085, blue: 0.105)
