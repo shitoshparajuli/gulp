@@ -18,17 +18,15 @@ struct PhotoStep: View {
 
                     photoArea
                         .padding(.horizontal, 20)
-
-                    Spacer(minLength: 100)
                 }
+                .padding(.bottom, 24)
             }
-
-            VStack {
-                Spacer()
-                continueButton
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
-            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            continueButton
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+                .background(Theme.background)
         }
         .navigationTitle("Add a photo")
         .navigationBarTitleDisplayMode(.inline)
@@ -40,15 +38,17 @@ struct PhotoStep: View {
     }
 
     private var restaurantHeader: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: "mappin.and.ellipse")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.accent)
+                .padding(.top, 2)
             VStack(alignment: .leading, spacing: 2) {
                 Text(viewModel.pickedRestaurant?.name.uppercased() ?? "")
                     .font(.system(size: 13, weight: .bold))
                     .tracking(0.6)
                     .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(2)
                 if let addr = viewModel.pickedRestaurant?.address {
                     Text(addr)
                         .font(.system(size: 11))
@@ -56,7 +56,7 @@ struct PhotoStep: View {
                         .lineLimit(1)
                 }
             }
-            Spacer()
+            Spacer(minLength: 8)
         }
     }
 

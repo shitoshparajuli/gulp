@@ -54,6 +54,8 @@ final class AddRatingViewModel {
     var pickedRestaurant: PlaceResult?
     var pickedRestaurantId: UUID?
     var existingDishes: [DishOption] = []
+    var myRatedDishes: [DishOption] = []
+    var otherDishes: [DishOption] = []
     var pickedDish: DishOption?
     var newDishName: String = ""
     var newDishCuisine: String = ""
@@ -153,13 +155,40 @@ final class AddRatingViewModel {
     func loadDishes() async {
         guard let restaurantId = pickedRestaurantId else { return }
         do {
-            existingDishes = try await supabase
+            let allDishes: [DishOption] = try await supabase
                 .from("dishes")
                 .select("id, display_name, cuisine")
                 .eq("restaurant_id", value: restaurantId)
                 .order("display_name")
                 .execute()
                 .value
+
+            existingDishes = allDishes
+
+            guard !allDishes.isEmpty else {
+                myRatedDishes = []
+                otherDishes = []
+                return
+            }
+
+            let userId = try await supabase.auth.session.user.id
+            let dishIds = allDishes.map(\.id)
+
+            struct RatedRow: Decodable {
+                let dishId: UUID
+                enum CodingKeys: String, CodingKey { case dishId = "dish_id" }
+            }
+            let mine: [RatedRow] = try await supabase
+                .from("ratings")
+                .select("dish_id")
+                .eq("user_id", value: userId)
+                .in("dish_id", values: dishIds)
+                .execute()
+                .value
+
+            let ratedIds = Set(mine.map(\.dishId))
+            myRatedDishes = allDishes.filter { ratedIds.contains($0.id) }
+            otherDishes = allDishes.filter { !ratedIds.contains($0.id) }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -231,6 +260,7 @@ final class AddRatingViewModel {
                         updated_at: ISO8601DateFormatter().string(from: Date())
                     ))
                     .eq("id", value: editingId)
+                    .eq("user_id", value: userId)
                     .execute()
             } else {
                 guard let restaurantId = pickedRestaurantId else { return false }
@@ -278,8 +308,8 @@ final class AddRatingViewModel {
         guard let data = image.jpegData(compressionQuality: 0.85) else {
             throw NSError(domain: "Photo", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not encode photo"])
         }
-        let filename = "\(UUID().uuidString).jpg"
-        let path = "\(userId.uuidString)/\(filename)"
+        let filename = "\(UUID().uuidString.lowercased()).jpg"
+        let path = "\(userId.uuidString.lowercased())/\(filename)"
         _ = try await supabase.storage
             .from("dish-photos")
             .upload(

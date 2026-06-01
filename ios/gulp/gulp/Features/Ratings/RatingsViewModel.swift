@@ -9,13 +9,18 @@ class RatingsViewModel {
     var isLoading = false
     var errorMessage: String?
 
-    func load() async {
+    func load(userId targetUserId: UUID? = nil) async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
         do {
-            let userId = try await supabase.auth.session.user.id
+            let userId: UUID
+            if let targetUserId {
+                userId = targetUserId
+            } else {
+                userId = try await supabase.auth.session.user.id
+            }
 
             let rows: [RatingResponse] = try await supabase
                 .from("ratings")
@@ -42,10 +47,12 @@ class RatingsViewModel {
 
     func deleteRating(_ rating: RatingResponse) async {
         do {
+            let userId = try await supabase.auth.session.user.id
             try await supabase
                 .from("ratings")
                 .update(["deleted_at": ISO8601DateFormatter().string(from: Date())])
                 .eq("id", value: rating.id)
+                .eq("user_id", value: userId)
                 .execute()
             await load()
         } catch {
@@ -55,11 +62,13 @@ class RatingsViewModel {
 
     func removeRestaurant(_ group: RestaurantGroup) async {
         do {
+            let userId = try await supabase.auth.session.user.id
             let ratingIds = group.ratings.map(\.id)
             try await supabase
                 .from("ratings")
                 .update(["deleted_at": ISO8601DateFormatter().string(from: Date())])
                 .in("id", values: ratingIds)
+                .eq("user_id", value: userId)
                 .execute()
             await load()
         } catch {

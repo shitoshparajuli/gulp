@@ -3,8 +3,9 @@ import SwiftUI
 struct RatingsView: View {
     var refreshTrigger: Int = 0
     var topAccessory: AnyView? = nil
+    var userId: UUID? = nil
+    var readOnly: Bool = false
     @State private var viewModel = RatingsViewModel()
-    @State private var selectedRating: RatingResponse?
     @State private var editingRating: RatingResponse?
     @State private var addToRestaurant: RestaurantResponse?
     @State private var pendingDelete: PendingDelete?
@@ -33,7 +34,7 @@ struct RatingsView: View {
                             ForEach(viewModel.groups) { group in
                                 RestaurantCard(
                                     group: group,
-                                    onDishTap: { selectedRating = $0 },
+                                    readOnly: readOnly,
                                     onEditDish: { editingRating = $0 },
                                     onDeleteDish: { pendingDelete = .rating($0) },
                                     onAddDish: { addToRestaurant = group.restaurant },
@@ -47,19 +48,14 @@ struct RatingsView: View {
                     }
                 }
             }
-            .refreshable { await viewModel.load() }
+            .refreshable { await viewModel.load(userId: userId) }
         }
         .preferredColorScheme(.dark)
-        .task(id: refreshTrigger) { await viewModel.load() }
-        .sheet(item: $selectedRating) { rating in
-            DishDetailSheet(rating: rating) {
-                editingRating = rating
-            }
-        }
-        .sheet(item: $editingRating, onDismiss: { Task { await viewModel.load() } }) { rating in
+        .task(id: refreshTrigger) { await viewModel.load(userId: userId) }
+        .sheet(item: $editingRating, onDismiss: { Task { await viewModel.load(userId: userId) } }) { rating in
             AddRatingView(mode: .editRating(rating))
         }
-        .sheet(item: $addToRestaurant, onDismiss: { Task { await viewModel.load() } }) { restaurant in
+        .sheet(item: $addToRestaurant, onDismiss: { Task { await viewModel.load(userId: userId) } }) { restaurant in
             AddRatingView(mode: .addToRestaurant(restaurant))
         }
         .confirmationDialog(
@@ -111,9 +107,11 @@ struct RatingsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("My Ratings")
-                .font(.system(size: 34, weight: .bold))
-                .foregroundStyle(Theme.textPrimary)
+            if !readOnly {
+                Text("My Ratings")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(Theme.textPrimary)
+            }
 
             if !viewModel.groups.isEmpty {
                 statLine
@@ -166,12 +164,14 @@ struct RatingsView: View {
                     .font(.system(size: 28, weight: .medium))
                     .foregroundStyle(Theme.accent)
             }
-            Text("Nothing rated yet")
+            Text(readOnly ? "No ratings yet" : "Nothing rated yet")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
-            Text("Tap the + below to rate a dish.")
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.textSecondary)
+            if !readOnly {
+                Text("Tap the + below to rate a dish.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.textSecondary)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 80)
@@ -185,7 +185,7 @@ enum PendingDelete {
 
 struct RestaurantCard: View {
     let group: RestaurantGroup
-    let onDishTap: (RatingResponse) -> Void
+    var readOnly: Bool = false
     let onEditDish: (RatingResponse) -> Void
     let onDeleteDish: (RatingResponse) -> Void
     let onAddDish: () -> Void
@@ -215,41 +215,48 @@ struct RestaurantCard: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(group.restaurant.name.uppercased())
-                    .font(.system(size: 17, weight: .bold))
-                    .tracking(0.5)
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
+            NavigationLink {
+                RestaurantDetailView(restaurant: group.restaurant)
+            } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(group.restaurant.name.uppercased())
+                        .font(.system(size: 17, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
 
-                if let address = group.restaurant.address {
-                    HStack(spacing: 4) {
-                        Image(systemName: "mappin.and.ellipse")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Theme.accent.opacity(0.85))
-                        Text(address)
+                    if let address = group.restaurant.address {
+                        HStack(spacing: 4) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Theme.accent.opacity(0.85))
+                            Text(address)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Theme.textSecondary)
+                                .lineLimit(1)
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        if let cuisine = primaryCuisine {
+                            Text(cuisine)
+                                .font(.system(size: 11, weight: .semibold))
+                                .tracking(0.4)
+                                .foregroundStyle(Theme.textSecondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Theme.surfaceElevated)
+                                .clipShape(Capsule())
+                        }
+                        Text("\(group.ratings.count) \(group.ratings.count == 1 ? "dish" : "dishes")")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Theme.textSecondary)
-                            .lineLimit(1)
+                            .foregroundStyle(Theme.textTertiary)
                     }
                 }
-
-                HStack(spacing: 8) {
-                    if let cuisine = primaryCuisine {
-                        Text(cuisine)
-                            .font(.system(size: 11, weight: .semibold))
-                            .tracking(0.4)
-                            .foregroundStyle(Theme.textSecondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Theme.surfaceElevated)
-                            .clipShape(Capsule())
-                    }
-                    Text("\(group.ratings.count) \(group.ratings.count == 1 ? "dish" : "dishes")")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Theme.textTertiary)
-                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+
             Spacer(minLength: 8)
 
             HStack(alignment: .top, spacing: 10) {
@@ -265,24 +272,26 @@ struct RestaurantCard: View {
                     }
                 }
 
-                Menu {
-                    Button {
-                        onAddDish()
+                if !readOnly {
+                    Menu {
+                        Button {
+                            onAddDish()
+                        } label: {
+                            Label("Add a dish", systemImage: "plus")
+                        }
+                        Button(role: .destructive) {
+                            onRemoveRestaurant()
+                        } label: {
+                            Label("Remove from list", systemImage: "trash")
+                        }
                     } label: {
-                        Label("Add a dish", systemImage: "plus")
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Theme.textSecondary)
+                            .frame(width: 28, height: 28)
+                            .background(Theme.surfaceElevated)
+                            .clipShape(Circle())
                     }
-                    Button(role: .destructive) {
-                        onRemoveRestaurant()
-                    } label: {
-                        Label("Remove from list", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Theme.textSecondary)
-                        .frame(width: 28, height: 28)
-                        .background(Theme.surfaceElevated)
-                        .clipShape(Circle())
                 }
             }
         }
@@ -292,7 +301,9 @@ struct RestaurantCard: View {
     }
 
     private func dishRow(_ rating: RatingResponse) -> some View {
-        Button { onDishTap(rating) } label: {
+        NavigationLink {
+            DishDetailView(dish: rating.dish)
+        } label: {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(rating.dish.displayName)
@@ -327,18 +338,27 @@ struct RestaurantCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())
-        .contextMenu {
-            Button {
-                onEditDish(rating)
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-            Button(role: .destructive) {
-                onDeleteDish(rating)
-            } label: {
-                Label("Delete", systemImage: "trash")
+        .if(!readOnly) { view in
+            view.contextMenu {
+                Button {
+                    onEditDish(rating)
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    onDeleteDish(rating)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
             }
         }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    fileprivate func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition { transform(self) } else { self }
     }
 }
 

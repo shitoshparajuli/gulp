@@ -21,28 +21,18 @@ struct DishPickerStep: View {
                             .padding(.horizontal, 20)
                     }
 
-                    if !viewModel.existingDishes.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("ALREADY ORDERED HERE")
-                                .font(.system(size: 10, weight: .heavy))
-                                .tracking(1.2)
-                                .foregroundStyle(Theme.textTertiary)
-                                .padding(.horizontal, 20)
+                    if !viewModel.myRatedDishes.isEmpty {
+                        dishSection(
+                            title: "ALREADY ORDERED HERE",
+                            dishes: viewModel.myRatedDishes
+                        )
+                    }
 
-                            VStack(spacing: 0) {
-                                ForEach(viewModel.existingDishes) { dish in
-                                    dishRow(dish)
-                                    if dish.id != viewModel.existingDishes.last?.id {
-                                        Rectangle()
-                                            .fill(Theme.hairline)
-                                            .frame(height: 1)
-                                            .padding(.leading, 20)
-                                    }
-                                }
-                            }
-                            .elevatedCard(cornerRadius: 16)
-                            .padding(.horizontal, 20)
-                        }
+                    if !viewModel.otherDishes.isEmpty {
+                        dishSection(
+                            title: "DISHES HERE",
+                            dishes: viewModel.otherDishes
+                        )
                     }
 
                     if !addingNew && !viewModel.existingDishes.isEmpty {
@@ -125,6 +115,30 @@ struct DishPickerStep: View {
         }
         .padding(18)
         .elevatedCard(cornerRadius: 16)
+    }
+
+    private func dishSection(title: String, dishes: [DishOption]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 10, weight: .heavy))
+                .tracking(1.2)
+                .foregroundStyle(Theme.textTertiary)
+                .padding(.horizontal, 20)
+
+            VStack(spacing: 0) {
+                ForEach(dishes) { dish in
+                    dishRow(dish)
+                    if dish.id != dishes.last?.id {
+                        Rectangle()
+                            .fill(Theme.hairline)
+                            .frame(height: 1)
+                            .padding(.leading, 20)
+                    }
+                }
+            }
+            .elevatedCard(cornerRadius: 16)
+            .padding(.horizontal, 20)
+        }
     }
 
     private func dishRow(_ dish: DishOption) -> some View {

@@ -13,39 +13,35 @@ struct HomeView: View {
                     header
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
-                        .padding(.bottom, 22)
+                        .padding(.bottom, 26)
 
                     if viewModel.isLoading && viewModel.feed.isEmpty && viewModel.suggestions.isEmpty {
                         loadingState
                     } else if viewModel.feed.isEmpty {
                         emptyState
                     } else {
-                        LazyVStack(spacing: 22) {
+                        LazyVStack(spacing: 28) {
                             ForEach(viewModel.feed) { item in
                                 FeedCard(item: item)
                             }
                         }
                         .padding(.horizontal, 18)
                         .padding(.top, 4)
-                        .padding(.bottom, 40)
+                        .padding(.bottom, 48)
                     }
                 }
             }
             .refreshable { await viewModel.load() }
         }
         .preferredColorScheme(.dark)
+        .toolbar(.hidden, for: .navigationBar)
         .task(id: refreshTrigger) { await viewModel.load() }
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Home")
-                .font(.system(size: 34, weight: .bold))
-                .foregroundStyle(Theme.textPrimary)
-            Text("What your friends are eating")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Theme.textTertiary)
-        }
+        Text("Home")
+            .font(.system(size: 34, weight: .bold))
+            .foregroundStyle(Theme.textPrimary)
     }
 
     private var loadingState: some View {
@@ -121,94 +117,92 @@ struct FeedCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let photoPath = item.rating.photoPath,
-               let url = dishPhotoURL(path: photoPath) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    case .failure:
-                        Theme.surface
-                    case .empty:
-                        Theme.surface
-                    @unknown default:
-                        Theme.surface
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 240)
-                .clipped()
-            }
+            userRow
+                .padding(.horizontal, 18)
+                .padding(.top, 16)
+                .padding(.bottom, hasPhoto ? 14 : 18)
 
-            VStack(alignment: .leading, spacing: 16) {
-                userRow
-                contentRow
-                if let notes = item.rating.notes, !notes.isEmpty {
-                    Text(notes)
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(4)
-                        .fixedSize(horizontal: false, vertical: true)
+            NavigationLink {
+                DishDetailView(dish: item.rating.dish)
+            } label: {
+                VStack(alignment: .leading, spacing: 0) {
+                    if hasPhoto, let photoPath = item.rating.photoPath,
+                       let url = dishPhotoURL(path: photoPath) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable().scaledToFill()
+                            default:
+                                Theme.surface
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 300)
+                        .clipped()
+                    }
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        dishRow
+                        if let notes = item.rating.notes, !notes.isEmpty {
+                            Text(notes)
+                                .font(.system(size: 14))
+                                .foregroundStyle(Theme.textSecondary)
+                                .lineLimit(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, hasPhoto ? 18 : 0)
+                    .padding(.bottom, 20)
                 }
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 16)
-            .padding(.bottom, 18)
+            .buttonStyle(.plain)
         }
-        .elevatedCard(cornerRadius: 20)
+        .elevatedCard(cornerRadius: 22)
     }
 
+    private var hasPhoto: Bool { item.rating.photoPath != nil }
+
     private var userRow: some View {
-        HStack(spacing: 10) {
-            Avatar(profile: item.profile, size: 34)
-            VStack(alignment: .leading, spacing: 1) {
+        NavigationLink {
+            UserProfileView(profile: item.profile)
+        } label: {
+            HStack(spacing: 10) {
+                Avatar(profile: item.profile, size: 32)
                 Text(item.profile.resolvedName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
-                Text("@\(item.profile.username) · \(timeAgo(item.rating.createdAt))")
-                    .font(.system(size: 11))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Text(timeAgo(item.rating.createdAt))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Theme.textTertiary)
             }
-            Spacer()
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
-    private var contentRow: some View {
-        HStack(alignment: .center, spacing: 16) {
+    private var dishRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(item.rating.dish.restaurant.name.uppercased())
-                    .font(.system(size: 11, weight: .heavy))
-                    .tracking(1.1)
-                    .foregroundStyle(Theme.textTertiary)
-                    .lineLimit(1)
                 Text(item.rating.dish.displayName)
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
-                if let address = item.rating.dish.restaurant.address {
-                    HStack(spacing: 4) {
-                        Image(systemName: "mappin.and.ellipse")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Theme.accent.opacity(0.85))
-                        Text(address)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Theme.textSecondary)
-                            .lineLimit(1)
-                    }
-                }
+                Text(item.rating.dish.restaurant.name.uppercased())
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(1.4)
+                    .foregroundStyle(Theme.textTertiary)
+                    .lineLimit(1)
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: 12)
             if let score = item.rating.score {
-                VStack(spacing: -2) {
-                    Text("\(score)")
-                        .font(.system(size: 46, weight: .bold, design: .rounded))
-                        .foregroundStyle(scoreGradient(Double(score)))
-                        .shadow(color: scoreColor(Double(score)).opacity(0.35), radius: 14, x: 0, y: 0)
-                    Text("/ 10")
-                        .font(.system(size: 10, weight: .heavy))
-                        .tracking(0.8)
-                        .foregroundStyle(Theme.textTertiary)
-                }
+                Text("\(score)")
+                    .font(.system(size: 38, weight: .bold, design: .rounded))
+                    .foregroundStyle(scoreGradient(Double(score)))
+                    .monospacedDigit()
             }
         }
     }
@@ -221,18 +215,27 @@ struct SuggestionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Avatar(profile: profile, size: 38)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(profile.resolvedName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
-                Text("@\(profile.username)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.textTertiary)
-                    .lineLimit(1)
+            NavigationLink {
+                UserProfileView(profile: profile)
+            } label: {
+                HStack(spacing: 12) {
+                    Avatar(profile: profile, size: 38)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(profile.resolvedName)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.textPrimary)
+                            .lineLimit(1)
+                        Text("@\(profile.username)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.textTertiary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                }
+                .contentShape(Rectangle())
             }
-            Spacer()
+            .buttonStyle(.plain)
+
             Button(action: onToggle) {
                 Text(isFollowing ? "Following" : "Follow")
                     .font(.system(size: 13, weight: .semibold))

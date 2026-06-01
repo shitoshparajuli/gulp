@@ -14,8 +14,14 @@ struct AppRoot: View {
         ZStack(alignment: .bottom) {
             Group {
                 switch selectedTab {
-                case .home: HomeView(refreshTrigger: contentVersion)
-                case .profile: ProfileView(auth: auth, refreshTrigger: contentVersion)
+                case .home:
+                    NavigationStack {
+                        HomeView(refreshTrigger: contentVersion)
+                    }
+                case .profile:
+                    NavigationStack {
+                        ProfileView(auth: auth, refreshTrigger: contentVersion)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
