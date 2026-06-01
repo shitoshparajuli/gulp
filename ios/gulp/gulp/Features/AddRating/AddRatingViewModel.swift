@@ -165,6 +165,44 @@ final class AddRatingViewModel {
         }
     }
 
+    func selectExistingDish(_ dish: DishOption) async {
+        pickedDish = dish
+        newDishName = ""
+        newDishCuisine = ""
+        isWorking = true
+        errorMessage = nil
+        defer { isWorking = false }
+
+        do {
+            let userId = try await supabase.auth.session.user.id
+            let rows: [RatingResponse] = try await supabase
+                .from("ratings")
+                .select("id, score, notes, photo_path, created_at, deleted_at, dishes(id, display_name, cuisine, restaurants(id, name, address))")
+                .eq("user_id", value: userId)
+                .eq("dish_id", value: dish.id)
+                .execute()
+                .value
+
+            if let existing = rows.first(where: { $0.deletedAt == nil }) {
+                editingRatingId = existing.id
+                score = existing.score ?? 8
+                notes = existing.notes ?? ""
+                existingPhotoPath = existing.photoPath
+            } else {
+                editingRatingId = nil
+                existingPhotoPath = nil
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func clearDishSelection() {
+        pickedDish = nil
+        editingRatingId = nil
+        existingPhotoPath = nil
+    }
+
     // MARK: - Save
 
     func save() async -> Bool {

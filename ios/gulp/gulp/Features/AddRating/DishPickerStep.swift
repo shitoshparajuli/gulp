@@ -114,7 +114,7 @@ struct DishPickerStep: View {
                 .tint(Theme.accent)
                 .focused($newDishFocused)
                 .onChange(of: viewModel.newDishName) { _, val in
-                    if !val.isEmpty { viewModel.pickedDish = nil }
+                    if !val.isEmpty { viewModel.clearDishSelection() }
                 }
             Rectangle().fill(Theme.hairline).frame(height: 1)
             TextField("Cuisine (optional)", text: $viewModel.newDishCuisine)
@@ -129,9 +129,7 @@ struct DishPickerStep: View {
 
     private func dishRow(_ dish: DishOption) -> some View {
         Button {
-            viewModel.pickedDish = dish
-            viewModel.newDishName = ""
-            viewModel.newDishCuisine = ""
+            Task { await viewModel.selectExistingDish(dish) }
             addingNew = false
         } label: {
             HStack(spacing: 12) {
@@ -147,6 +145,16 @@ struct DishPickerStep: View {
                 }
                 Spacer()
                 if viewModel.pickedDish?.id == dish.id {
+                    if viewModel.editingRatingId != nil {
+                        Text("EDIT")
+                            .font(.system(size: 9, weight: .heavy))
+                            .tracking(0.8)
+                            .foregroundStyle(Theme.accent)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.accent.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(Theme.accent)
@@ -161,7 +169,7 @@ struct DishPickerStep: View {
 
     private var continueButton: some View {
         Button { navigateToScore = true } label: {
-            Text("Continue")
+            Text(viewModel.editingRatingId != nil ? "Edit Rating" : "Continue")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.black)
                 .frame(maxWidth: .infinity)
@@ -169,7 +177,7 @@ struct DishPickerStep: View {
                 .background(viewModel.canProceedToScore ? Theme.accent : Theme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .disabled(!viewModel.canProceedToScore)
+        .disabled(!viewModel.canProceedToScore || viewModel.isWorking)
         .animation(.easeOut(duration: 0.15), value: viewModel.canProceedToScore)
     }
 }
