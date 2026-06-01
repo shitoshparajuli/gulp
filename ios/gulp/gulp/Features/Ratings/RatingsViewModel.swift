@@ -39,4 +39,35 @@ class RatingsViewModel {
             errorMessage = error.localizedDescription
         }
     }
+
+    func deleteRating(_ rating: RatingResponse) async {
+        do {
+            try await supabase
+                .from("ratings")
+                .update(["deleted_at": ISO8601DateFormatter().string(from: Date())])
+                .eq("id", value: rating.id)
+                .execute()
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func removeRestaurant(_ group: RestaurantGroup) async {
+        do {
+            let ratingIds = group.ratings.map(\.id)
+            try await supabase
+                .from("ratings")
+                .update(["deleted_at": ISO8601DateFormatter().string(from: Date())])
+                .in("id", values: ratingIds)
+                .execute()
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+func dishPhotoURL(path: String) -> URL? {
+    URL(string: "https://rheqemyqgahwstphguxn.supabase.co/storage/v1/object/public/dish-photos/\(path)")
 }

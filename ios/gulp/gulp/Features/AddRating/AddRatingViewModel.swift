@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Observation
 import Supabase
 
@@ -37,6 +38,14 @@ private struct NewRating: Encodable {
     let dish_id: String
     let score: Int
     let notes: String?
+    let photo_path: String?
+}
+
+private struct RatingUpdate: Encodable {
+    let score: Int
+    let notes: String?
+    let photo_path: String?
+    let updated_at: String
 }
 
 @MainActor
@@ -48,15 +57,56 @@ final class AddRatingViewModel {
     var pickedDish: DishOption?
     var newDishName: String = ""
     var newDishCuisine: String = ""
+    var selectedPhoto: UIImage?
+    var existingPhotoPath: String?
     var score: Int = 8
     var notes: String = ""
     var isWorking = false
     var errorMessage: String?
 
-    var canProceedToDish: Bool { pickedRestaurantId != nil }
+    var editingRatingId: UUID?
+
     var canProceedToScore: Bool {
         pickedDish != nil || !newDishName.trimmingCharacters(in: .whitespaces).isEmpty
     }
+
+    var isEditing: Bool { editingRatingId != nil }
+
+    // MARK: - Mode setup
+
+    func configureForAddToRestaurant(restaurant: RestaurantResponse) async {
+        pickedRestaurantId = restaurant.id
+        pickedRestaurant = PlaceResult(
+            id: "",
+            name: restaurant.name,
+            address: restaurant.address,
+            latitude: 0,
+            longitude: 0
+        )
+        await loadDishes()
+    }
+
+    func configureForEdit(rating: RatingResponse) {
+        editingRatingId = rating.id
+        score = rating.score ?? 8
+        notes = rating.notes ?? ""
+        existingPhotoPath = rating.photoPath
+        pickedRestaurantId = rating.dish.restaurant.id
+        pickedRestaurant = PlaceResult(
+            id: "",
+            name: rating.dish.restaurant.name,
+            address: rating.dish.restaurant.address,
+            latitude: 0,
+            longitude: 0
+        )
+        pickedDish = DishOption(
+            id: rating.dish.id,
+            displayName: rating.dish.displayName,
+            cuisine: rating.dish.cuisine
+        )
+    }
+
+    // MARK: - Restaurant selection (new from scratch)
 
     func selectRestaurant(_ place: PlaceResult) async {
         pickedRestaurant = place
@@ -100,7 +150,7 @@ final class AddRatingViewModel {
         }
     }
 
-    private func loadDishes() async {
+    func loadDishes() async {
         guard let restaurantId = pickedRestaurantId else { return }
         do {
             existingDishes = try await supabase
@@ -115,9 +165,9 @@ final class AddRatingViewModel {
         }
     }
 
-    func save() async -> Bool {
-        guard let restaurantId = pickedRestaurantId else { return false }
+    // MARK: - Save
 
+    func save() async -> Bool {
         isWorking = true
         errorMessage = nil
         defer { isWorking = false }
@@ -125,42 +175,81 @@ final class AddRatingViewModel {
         do {
             let userId = try await supabase.auth.session.user.id
 
-            let dishId: UUID
-            if let picked = pickedDish {
-                dishId = picked.id
-            } else {
-                let cuisine = newDishCuisine.trimmingCharacters(in: .whitespaces)
-                let inserted: IDOnly = try await supabase
-                    .from("dishes")
-                    .insert(NewDish(
-                        restaurant_id: restaurantId.uuidString,
-                        display_name: newDishName.trimmingCharacters(in: .whitespaces),
-                        cuisine: cuisine.isEmpty ? nil : cuisine,
-                        added_by: userId.uuidString
-                    ))
-                    .select("id")
-                    .single()
-                    .execute()
-                    .value
-                dishId = inserted.id
+            var photoPath: String? = existingPhotoPath
+            if let image = selectedPhoto {
+                photoPath = try await uploadPhoto(image, userId: userId)
             }
 
             let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-            try await supabase
-                .from("ratings")
-                .insert(NewRating(
-                    user_id: userId.uuidString,
-                    dish_id: dishId.uuidString,
-                    score: score,
-                    notes: trimmedNotes.isEmpty ? nil : trimmedNotes
-                ))
-                .execute()
+            let cleanNotes: String? = trimmedNotes.isEmpty ? nil : trimmedNotes
+
+            if let editingId = editingRatingId {
+                try await supabase
+                    .from("ratings")
+                    .update(RatingUpdate(
+                        score: score,
+                        notes: cleanNotes,
+                        photo_path: photoPath,
+                        updated_at: ISO8601DateFormatter().string(from: Date())
+                    ))
+                    .eq("id", value: editingId)
+                    .execute()
+            } else {
+                guard let restaurantId = pickedRestaurantId else { return false }
+
+                let dishId: UUID
+                if let picked = pickedDish {
+                    dishId = picked.id
+                } else {
+                    let cuisine = newDishCuisine.trimmingCharacters(in: .whitespaces)
+                    let inserted: IDOnly = try await supabase
+                        .from("dishes")
+                        .insert(NewDish(
+                            restaurant_id: restaurantId.uuidString,
+                            display_name: newDishName.trimmingCharacters(in: .whitespaces),
+                            cuisine: cuisine.isEmpty ? nil : cuisine,
+                            added_by: userId.uuidString
+                        ))
+                        .select("id")
+                        .single()
+                        .execute()
+                        .value
+                    dishId = inserted.id
+                }
+
+                try await supabase
+                    .from("ratings")
+                    .insert(NewRating(
+                        user_id: userId.uuidString,
+                        dish_id: dishId.uuidString,
+                        score: score,
+                        notes: cleanNotes,
+                        photo_path: photoPath
+                    ))
+                    .execute()
+            }
 
             return true
         } catch {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    private func uploadPhoto(_ image: UIImage, userId: UUID) async throws -> String {
+        guard let data = image.jpegData(compressionQuality: 0.85) else {
+            throw NSError(domain: "Photo", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not encode photo"])
+        }
+        let filename = "\(UUID().uuidString).jpg"
+        let path = "\(userId.uuidString)/\(filename)"
+        _ = try await supabase.storage
+            .from("dish-photos")
+            .upload(
+                path,
+                data: data,
+                options: FileOptions(contentType: "image/jpeg", upsert: false)
+            )
+        return path
     }
 }
 

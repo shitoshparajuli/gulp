@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DishDetailSheet: View {
     let rating: RatingResponse
+    var onEdit: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -9,18 +10,35 @@ struct DishDetailSheet: View {
             Theme.background.ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 36) {
+                VStack(spacing: 32) {
                     handle
+
+                    if let path = rating.photoPath, let url = dishPhotoURL(path: path) {
+                        photoBlock(url: url)
+                            .padding(.horizontal, 20)
+                    }
+
                     scoreHero
                     dishInfo
+
                     if let notes = rating.notes, !notes.isEmpty {
                         notesCard(notes)
+                            .padding(.horizontal, 20)
                     }
+
                     metaRow
-                    Spacer(minLength: 24)
+                    Spacer(minLength: onEdit != nil ? 96 : 24)
                 }
-                .padding(.horizontal, 24)
                 .padding(.top, 12)
+            }
+
+            if onEdit != nil {
+                VStack {
+                    Spacer()
+                    editButton
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 24)
+                }
             }
         }
         .preferredColorScheme(.dark)
@@ -34,6 +52,22 @@ struct DishDetailSheet: View {
             .fill(Theme.textTertiary)
             .frame(width: 36, height: 4)
             .padding(.bottom, 8)
+    }
+
+    private func photoBlock(url: URL) -> some View {
+        AsyncImage(url: url) { image in
+            image.resizable().scaledToFill()
+        } placeholder: {
+            Theme.surface
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 240)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Theme.hairline, lineWidth: 1)
+        }
     }
 
     private var scoreHero: some View {
@@ -83,6 +117,7 @@ struct DishDetailSheet: View {
             }
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 24)
     }
 
     private func notesCard(_ notes: String) -> some View {
@@ -103,12 +138,7 @@ struct DishDetailSheet: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(Theme.surface)
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Theme.hairline, lineWidth: 1)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .elevatedCard(cornerRadius: 16)
     }
 
     private var metaRow: some View {
@@ -120,5 +150,26 @@ struct DishDetailSheet: View {
         }
         .foregroundStyle(Theme.textTertiary)
         .frame(maxWidth: .infinity)
+    }
+
+    private var editButton: some View {
+        Button {
+            dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                onEdit?()
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("Edit")
+                    .font(.system(size: 15, weight: .semibold))
+            }
+            .foregroundStyle(.black)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Theme.accent)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
     }
 }

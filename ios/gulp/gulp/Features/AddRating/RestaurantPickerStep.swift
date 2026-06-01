@@ -4,7 +4,7 @@ struct RestaurantPickerStep: View {
     @Bindable var viewModel: AddRatingViewModel
     @State private var searchService = RestaurantSearchService()
     @State private var query: String = ""
-    @State private var navigateToDish = false
+    @State private var navigateToPhoto = false
 
     var body: some View {
         ZStack {
@@ -25,8 +25,8 @@ struct RestaurantPickerStep: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $navigateToDish) {
-            DishPickerStep(viewModel: viewModel)
+        .navigationDestination(isPresented: $navigateToPhoto) {
+            PhotoStep(viewModel: viewModel)
         }
     }
 
@@ -137,7 +137,7 @@ struct RestaurantPickerStep: View {
             let place = try await searchService.resolve(suggestion)
             await viewModel.selectRestaurant(place)
             if viewModel.pickedRestaurantId != nil {
-                navigateToDish = true
+                navigateToPhoto = true
             }
         } catch {
             viewModel.errorMessage = error.localizedDescription

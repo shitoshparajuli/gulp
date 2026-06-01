@@ -1,10 +1,12 @@
 import SwiftUI
+import PhotosUI
 
 struct ScoreInputStep: View {
     @Bindable var viewModel: AddRatingViewModel
     @Environment(\.dismissAddFlow) private var dismissAddFlow
 
     @State private var sliderValue: Double = 8
+    @State private var photoItem: PhotosPickerItem?
 
     var body: some View {
         ZStack {
@@ -12,16 +14,23 @@ struct ScoreInputStep: View {
 
             ScrollView {
                 VStack(spacing: 0) {
+                    if viewModel.isEditing {
+                        editPhotoStrip
+                            .padding(.horizontal, 20)
+                            .padding(.top, 12)
+                            .padding(.bottom, 18)
+                    }
+
                     dishHeader
-                        .padding(.top, 8)
-                        .padding(.bottom, 32)
+                        .padding(.top, viewModel.isEditing ? 0 : 8)
+                        .padding(.bottom, 28)
 
                     scoreHero
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 18)
 
                     slider
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 36)
+                        .padding(.bottom, 32)
 
                     notesCard
                         .padding(.horizontal, 20)
@@ -46,7 +55,7 @@ struct ScoreInputStep: View {
                     .padding(.bottom, 24)
             }
         }
-        .navigationTitle("Rate it")
+        .navigationTitle(viewModel.isEditing ? "Edit rating" : "Rate it")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -54,11 +63,72 @@ struct ScoreInputStep: View {
         .onChange(of: sliderValue) { _, new in
             viewModel.score = Int(new.rounded())
         }
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    viewModel.selectedPhoto = image
+                }
+            }
+        }
     }
 
     private var dishName: String {
         viewModel.pickedDish?.displayName
             ?? (viewModel.newDishName.isEmpty ? "Your dish" : viewModel.newDishName)
+    }
+
+    @ViewBuilder
+    private var editPhotoStrip: some View {
+        PhotosPicker(selection: $photoItem, matching: .images) {
+            HStack(spacing: 12) {
+                photoThumbnail
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(hasAnyPhoto ? "Replace photo" : "Add a photo")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(hasAnyPhoto ? "Tap to pick a different one" : "Pick one from your library")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+            }
+            .padding(12)
+            .elevatedCard(cornerRadius: 14)
+        }
+    }
+
+    private var hasAnyPhoto: Bool {
+        viewModel.selectedPhoto != nil || viewModel.existingPhotoPath != nil
+    }
+
+    @ViewBuilder
+    private var photoThumbnail: some View {
+        Group {
+            if let img = viewModel.selectedPhoto {
+                Image(uiImage: img).resizable().scaledToFill()
+            } else if let path = viewModel.existingPhotoPath, let url = dishPhotoURL(path: path) {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Theme.surfaceElevated
+                }
+            } else {
+                Theme.surfaceElevated
+                    .overlay {
+                        Image(systemName: "camera")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Theme.textTertiary)
+                    }
+            }
+        }
+        .frame(width: 56, height: 56)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var dishHeader: some View {
@@ -150,7 +220,7 @@ struct ScoreInputStep: View {
                     ProgressView()
                         .tint(.black)
                 }
-                Text(viewModel.isWorking ? "Saving..." : "Save Rating")
+                Text(viewModel.isWorking ? "Saving..." : (viewModel.isEditing ? "Save Changes" : "Save Rating"))
                     .font(.system(size: 16, weight: .semibold))
             }
             .foregroundStyle(.black)
