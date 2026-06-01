@@ -8,12 +8,13 @@ struct AppRoot: View {
     @Bindable var auth: AuthViewModel
     @State private var selectedTab: AppTab = .ratings
     @State private var showAdd = false
+    @State private var ratingsVersion = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
             Group {
                 switch selectedTab {
-                case .ratings: RatingsView()
+                case .ratings: RatingsView(refreshTrigger: ratingsVersion)
                 case .profile: ProfileView(auth: auth)
                 }
             }
@@ -25,7 +26,9 @@ struct AppRoot: View {
             }
         }
         .ignoresSafeArea(.keyboard)
-        .sheet(isPresented: $showAdd) {
+        .sheet(isPresented: $showAdd, onDismiss: {
+            ratingsVersion &+= 1
+        }) {
             AddRatingView()
         }
     }

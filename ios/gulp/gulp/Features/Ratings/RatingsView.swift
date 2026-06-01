@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RatingsView: View {
+    var refreshTrigger: Int = 0
     @State private var viewModel = RatingsViewModel()
     @State private var selectedRating: RatingResponse?
 
@@ -36,7 +37,7 @@ struct RatingsView: View {
             .refreshable { await viewModel.load() }
         }
         .preferredColorScheme(.dark)
-        .task { await viewModel.load() }
+        .task(id: refreshTrigger) { await viewModel.load() }
         .sheet(item: $selectedRating) { rating in
             DishDetailSheet(rating: rating)
         }
