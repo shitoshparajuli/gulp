@@ -9,13 +9,11 @@ struct gulpApp: App {
         WindowGroup {
             Group {
                 if auth.isSignedIn {
-                    VStack(spacing: 16) {
-                        Text("Signed in as \(auth.username)")
-                            .font(.headline)
-                        Button("Sign Out") {
-                            Task { await auth.signOut() }
-                        }
-                        .foregroundStyle(.red)
+                    TabView {
+                        RatingsView()
+                            .tabItem { Label("Ratings", systemImage: "star.fill") }
+                        ProfileView(auth: auth)
+                            .tabItem { Label("Profile", systemImage: "person.fill") }
                     }
                 } else {
                     LoginView(auth: auth)
