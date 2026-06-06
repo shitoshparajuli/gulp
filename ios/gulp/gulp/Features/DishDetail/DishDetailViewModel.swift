@@ -7,6 +7,7 @@ import Supabase
 final class DishDetailViewModel {
     let dish: DishResponse
     var myRating: RatingResponse?
+    var photos: [DishPhoto] = []
     var communityAvg: Double?
     var communityCount: Int = 0
     var isLoading = false
@@ -46,6 +47,14 @@ final class DishDetailViewModel {
                 .from("ratings")
                 .select("id, user_id, score, notes, photo_path, created_at, deleted_at")
                 .eq("dish_id", value: dish.id)
+                .execute()
+                .value
+
+            photos = try await supabase
+                .from("dish_photos")
+                .select("id, photo_path, user_id, created_at")
+                .eq("dish_id", value: dish.id)
+                .order("created_at", ascending: false)
                 .execute()
                 .value
 

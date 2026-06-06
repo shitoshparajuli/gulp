@@ -38,6 +38,20 @@ struct RestaurantResponse: Decodable, Identifiable {
     let address: String?
 }
 
+struct DishPhoto: Decodable, Identifiable {
+    let id: UUID
+    let photoPath: String
+    let userId: UUID
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case photoPath = "photo_path"
+        case userId = "user_id"
+        case createdAt = "created_at"
+    }
+}
+
 struct RestaurantGroup: Identifiable {
     let restaurant: RestaurantResponse
     var ratings: [RatingResponse]

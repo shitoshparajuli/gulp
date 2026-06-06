@@ -17,10 +17,7 @@ struct DishDetailView: View {
 
             ScrollView {
                 VStack(spacing: 28) {
-                    if let path = viewModel.myRating?.photoPath, let url = dishPhotoURL(path: path) {
-                        photoBlock(url: url)
-                            .padding(.horizontal, 20)
-                    }
+                    photoSection
 
                     hero
                     dishInfo
@@ -185,14 +182,51 @@ struct DishDetailView: View {
         .elevatedCard(cornerRadius: 16)
     }
 
-    private func photoBlock(url: URL) -> some View {
+    /// Photo paths for this dish, newest first. Falls back to the user's own
+    /// rating photo for the brief window before dish_photos is populated.
+    private var photoURLs: [URL] {
+        var paths = viewModel.photos.map(\.photoPath)
+        if paths.isEmpty, let mine = viewModel.myRating?.photoPath {
+            paths = [mine]
+        }
+        return paths.compactMap { dishPhotoURL(path: $0) }
+    }
+
+    @ViewBuilder
+    private var photoSection: some View {
+        let urls = photoURLs
+        if urls.count == 1 {
+            photoBlock(url: urls[0], width: nil)
+                .padding(.horizontal, 20)
+        } else if urls.count > 1 {
+            VStack(spacing: 10) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(urls, id: \.self) { url in
+                            photoBlock(url: url, width: 300)
+                        }
+                    }
+                    .scrollTargetLayout()
+                    .padding(.horizontal, 20)
+                }
+                .scrollTargetBehavior(.viewAligned)
+
+                Text("\(urls.count) PHOTOS")
+                    .font(.system(size: 10, weight: .heavy))
+                    .tracking(1.2)
+                    .foregroundStyle(Theme.textTertiary)
+            }
+        }
+    }
+
+    private func photoBlock(url: URL, width: CGFloat?) -> some View {
         AsyncImage(url: url) { image in
             image.resizable().scaledToFill()
         } placeholder: {
             Theme.surface
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 240)
+        .frame(maxWidth: width == nil ? .infinity : nil)
+        .frame(width: width, height: 240)
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {

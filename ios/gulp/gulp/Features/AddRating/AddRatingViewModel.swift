@@ -305,7 +305,10 @@ final class AddRatingViewModel {
     }
 
     private func uploadPhoto(_ image: UIImage, userId: UUID) async throws -> String {
-        guard let data = image.jpegData(compressionQuality: 0.85) else {
+        // Camera images come in at full sensor resolution (multi-MB). Downscale
+        // to a max long edge that's still sharp on any phone screen, then JPEG it.
+        let resized = image.downscaled(maxDimension: 1280)
+        guard let data = resized.jpegData(compressionQuality: 0.7) else {
             throw NSError(domain: "Photo", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not encode photo"])
         }
         let filename = "\(UUID().uuidString.lowercased()).jpg"
