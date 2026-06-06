@@ -4,6 +4,11 @@
 <dict>
 	<key>GIDClientID</key>
 	<string>780047152397-mso7l8n0bkok14m8of87sm7fngkldaih.apps.googleusercontent.com</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+		<string>waze</string>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -20,6 +20,7 @@ struct UserProfileView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .hidesAppTabBar()
         .task { await viewModel.load() }
     }
 

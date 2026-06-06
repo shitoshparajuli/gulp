@@ -9,6 +9,7 @@ struct AppRoot: View {
     @State private var selectedTab: AppTab = .home
     @State private var showAdd = false
     @State private var contentVersion = 0
+    @State private var tabBar = TabBarVisibility()
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -25,18 +26,52 @@ struct AppRoot: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .safeAreaPadding(.bottom, 64)
+            .safeAreaPadding(.bottom, tabBar.isHidden ? 0 : 64)
 
-            CustomTabBar(selection: $selectedTab) {
-                showAdd = true
+            if !tabBar.isHidden {
+                CustomTabBar(selection: $selectedTab) {
+                    showAdd = true
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .environment(tabBar)
+        .animation(.easeInOut(duration: 0.25), value: tabBar.isHidden)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showAdd, onDismiss: {
             contentVersion &+= 1
         }) {
             AddRatingView()
         }
+    }
+}
+
+/// Visibility state for the global floating tab bar. Uses a depth counter so the
+/// bar stays hidden across nested detail pushes (e.g. dish → restaurant → dish)
+/// and only reappears once every drilled-in screen has been popped.
+@MainActor
+@Observable
+final class TabBarVisibility {
+    private var depth = 0
+    var isHidden: Bool { depth > 0 }
+    func push() { depth += 1 }
+    func pop() { depth = max(0, depth - 1) }
+}
+
+private struct HidesAppTabBar: ViewModifier {
+    @Environment(TabBarVisibility.self) private var tabBar
+    func body(content: Content) -> some View {
+        content
+            .onAppear { tabBar.push() }
+            .onDisappear { tabBar.pop() }
+    }
+}
+
+extension View {
+    /// Hides the global floating tab bar while this screen is on the navigation stack.
+    /// Apply to pushed detail screens that own the bottom of the screen.
+    func hidesAppTabBar() -> some View {
+        modifier(HidesAppTabBar())
     }
 }
 

@@ -5,7 +5,6 @@ struct ScoreInputStep: View {
     @Bindable var viewModel: AddRatingViewModel
     @Environment(\.dismissAddFlow) private var dismissAddFlow
 
-    @State private var sliderValue: Double = 8
     @State private var photoItem: PhotosPickerItem?
 
     var body: some View {
@@ -59,10 +58,6 @@ struct ScoreInputStep: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .onAppear { sliderValue = Double(viewModel.score) }
-        .onChange(of: sliderValue) { _, new in
-            viewModel.score = Int(new.rounded())
-        }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             Task {
@@ -168,8 +163,15 @@ struct ScoreInputStep: View {
 
     private var slider: some View {
         VStack(spacing: 8) {
-            Slider(value: $sliderValue, in: 1...10, step: 1)
-                .tint(scoreColor(sliderValue))
+            Slider(
+                value: Binding(
+                    get: { Double(viewModel.score) },
+                    set: { viewModel.score = Int($0.rounded()) }
+                ),
+                in: 1...10,
+                step: 1
+            )
+            .tint(scoreColor(Double(viewModel.score)))
 
             HStack {
                 Text("1")

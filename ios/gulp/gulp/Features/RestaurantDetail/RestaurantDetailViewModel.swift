@@ -64,6 +64,18 @@ final class RestaurantDetailViewModel {
         dishes.filter { $0.communityCount > 0 }.count
     }
 
+    /// Dishes the current user has personally rated, best (own score) first.
+    var triedDishes: [DishAggregate] {
+        dishes
+            .filter { $0.myScore != nil }
+            .sorted { ($0.myScore ?? 0) > ($1.myScore ?? 0) }
+    }
+
+    /// Dishes the current user hasn't rated yet, keeping the community-avg sort.
+    var untriedDishes: [DishAggregate] {
+        dishes.filter { $0.myScore == nil }
+    }
+
     var restaurantAvg: Double? {
         let weighted = dishes.reduce(into: (sum: 0.0, count: 0)) { acc, dish in
             if let avg = dish.communityAvg {

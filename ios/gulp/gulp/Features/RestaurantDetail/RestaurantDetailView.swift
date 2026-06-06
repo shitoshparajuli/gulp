@@ -4,6 +4,7 @@ struct RestaurantDetailView: View {
     let restaurant: RestaurantResponse
     @State private var viewModel: RestaurantDetailViewModel
     @State private var addingDish: RestaurantResponse?
+    @State private var showMapOptions = false
 
     init(restaurant: RestaurantResponse) {
         self.restaurant = restaurant
@@ -22,7 +23,7 @@ struct RestaurantDetailView: View {
                     } else if viewModel.dishes.isEmpty {
                         emptyState
                     } else {
-                        dishList
+                        dishSections
                             .padding(.horizontal, 18)
                     }
                     Spacer(minLength: 104)
@@ -57,6 +58,7 @@ struct RestaurantDetailView: View {
         .toolbarBackground(Theme.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .hidesAppTabBar()
         .task { await viewModel.load() }
         .refreshable { await viewModel.load() }
         .sheet(item: $addingDish, onDismiss: { Task { await viewModel.load() } }) { restaurant in
@@ -74,13 +76,27 @@ struct RestaurantDetailView: View {
                 .padding(.horizontal, 24)
 
             if let address = restaurant.address {
-                HStack(spacing: 4) {
-                    Image(systemName: "mappin.and.ellipse")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.accent.opacity(0.85))
-                    Text(address)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Theme.textSecondary)
+                Button {
+                    openInMaps()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.accent.opacity(0.85))
+                        Text(address)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Theme.textSecondary)
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Theme.textTertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableButtonStyle())
+                .confirmationDialog("Open in", isPresented: $showMapOptions, titleVisibility: .visible) {
+                    ForEach(MapLauncher.available) { app in
+                        Button(app.displayName) { MapLauncher.open(app, query: mapQuery) }
+                    }
                 }
             }
 
@@ -155,9 +171,52 @@ struct RestaurantDetailView: View {
         .padding(.top, 60)
     }
 
-    private var dishList: some View {
+    private var dishSections: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            if !viewModel.triedDishes.isEmpty {
+                section(
+                    title: "YOU'VE TRIED",
+                    icon: "checkmark.circle.fill",
+                    dishes: viewModel.triedDishes
+                )
+            }
+            if !viewModel.untriedDishes.isEmpty {
+                section(
+                    title: "HAVEN'T TRIED",
+                    icon: "circle.dashed",
+                    dishes: viewModel.untriedDishes
+                )
+            }
+        }
+    }
+
+    private func section(title: String, icon: String, dishes: [DishAggregate]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Theme.textTertiary)
+                Text(title)
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(1.2)
+                    .foregroundStyle(Theme.textTertiary)
+                Text("\(dishes.count)")
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Theme.surfaceElevated)
+                    .clipShape(Capsule())
+            }
+            .padding(.leading, 4)
+
+            dishCard(dishes)
+        }
+    }
+
+    private func dishCard(_ dishes: [DishAggregate]) -> some View {
         VStack(spacing: 0) {
-            ForEach(Array(viewModel.dishes.enumerated()), id: \.element.id) { index, dish in
+            ForEach(Array(dishes.enumerated()), id: \.element.id) { index, dish in
                 NavigationLink {
                     DishDetailView(dish: dish.asDishResponse(restaurant: restaurant))
                 } label: {
@@ -165,7 +224,7 @@ struct RestaurantDetailView: View {
                 }
                 .buttonStyle(PressableButtonStyle())
 
-                if index < viewModel.dishes.count - 1 {
+                if index < dishes.count - 1 {
                     Rectangle()
                         .fill(Theme.hairline)
                         .frame(height: 1)
@@ -180,6 +239,22 @@ struct RestaurantDetailView: View {
         value.truncatingRemainder(dividingBy: 1) == 0
             ? String(format: "%.0f", value)
             : String(format: "%.1f", value)
+    }
+
+    private var mapQuery: String {
+        [restaurant.name, restaurant.address]
+            .compactMap { $0 }
+            .joined(separator: ", ")
+    }
+
+    private func openInMaps() {
+        let apps = MapLauncher.available
+        // Only one choice (typically Apple Maps alone) → skip the picker.
+        if apps.count <= 1 {
+            MapLauncher.open(apps.first ?? .apple, query: mapQuery)
+        } else {
+            showMapOptions = true
+        }
     }
 }
 

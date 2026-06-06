@@ -30,7 +30,7 @@ struct RatingsView: View {
                     } else if viewModel.groups.isEmpty {
                         emptyState
                     } else {
-                        LazyVStack(spacing: 18) {
+                        LazyVStack(spacing: 24) {
                             ForEach(viewModel.groups) { group in
                                 RestaurantCard(
                                     group: group,
@@ -197,20 +197,23 @@ struct RestaurantCard: View {
         return counts.max(by: { $0.value < $1.value })?.key
     }
 
+    private var subtitle: String? {
+        let parts = [primaryCuisine, group.restaurant.address].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 4) {
             header
-            ForEach(Array(group.ratings.enumerated()), id: \.element.id) { index, rating in
-                dishRow(rating)
-                if index < group.ratings.count - 1 {
-                    Rectangle()
-                        .fill(Theme.hairline)
-                        .frame(height: 1)
-                        .padding(.leading, 20)
+            VStack(spacing: 4) {
+                ForEach(group.ratings) { rating in
+                    dishRow(rating)
                 }
             }
+            .padding(.horizontal, 6)
+            .padding(.bottom, 12)
         }
-        .elevatedCard(cornerRadius: 20)
+        .elevatedCard(cornerRadius: 24)
     }
 
     private var header: some View {
@@ -218,39 +221,18 @@ struct RestaurantCard: View {
             NavigationLink {
                 RestaurantDetailView(restaurant: group.restaurant)
             } label: {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(group.restaurant.name.uppercased())
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: 18, weight: .bold))
                         .tracking(0.5)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
 
-                    if let address = group.restaurant.address {
-                        HStack(spacing: 4) {
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(Theme.accent.opacity(0.85))
-                            Text(address)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(Theme.textSecondary)
-                                .lineLimit(1)
-                        }
-                    }
-
-                    HStack(spacing: 8) {
-                        if let cuisine = primaryCuisine {
-                            Text(cuisine)
-                                .font(.system(size: 11, weight: .semibold))
-                                .tracking(0.4)
-                                .foregroundStyle(Theme.textSecondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Theme.surfaceElevated)
-                                .clipShape(Capsule())
-                        }
-                        Text("\(group.ratings.count) \(group.ratings.count == 1 ? "dish" : "dishes")")
+                    if let subtitle {
+                        Text(subtitle)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(Theme.textTertiary)
+                            .lineLimit(1)
                     }
                 }
                 .contentShape(Rectangle())
@@ -259,15 +241,17 @@ struct RestaurantCard: View {
 
             Spacer(minLength: 8)
 
-            HStack(alignment: .top, spacing: 10) {
+            HStack(alignment: .top, spacing: 6) {
                 if let avg = group.averageScore {
-                    VStack(spacing: 0) {
+                    VStack(spacing: 1) {
                         Text(String(format: "%.1f", avg))
-                            .font(.system(size: 30, weight: .bold, design: .rounded))
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundStyle(scoreGradient(avg))
+                            .monospacedDigit()
+                            .shadow(color: scoreColor(avg).opacity(0.4), radius: 12, y: 0)
                         Text("AVG")
                             .font(.system(size: 9, weight: .heavy))
-                            .tracking(1.0)
+                            .tracking(1.2)
                             .foregroundStyle(Theme.textTertiary)
                     }
                 }
@@ -286,18 +270,17 @@ struct RestaurantCard: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Theme.textSecondary)
-                            .frame(width: 28, height: 28)
-                            .background(Theme.surfaceElevated)
-                            .clipShape(Circle())
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Theme.textTertiary)
+                            .frame(width: 24, height: 28)
+                            .contentShape(Rectangle())
                     }
                 }
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 18)
-        .padding(.bottom, 16)
+        .padding(.top, 20)
+        .padding(.bottom, 8)
     }
 
     private func dishRow(_ rating: RatingResponse) -> some View {
@@ -305,36 +288,18 @@ struct RestaurantCard: View {
             DishDetailView(dish: rating.dish)
         } label: {
             HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(rating.dish.displayName)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
-                    if let notes = rating.notes, !notes.isEmpty {
-                        Text(notes)
-                            .font(.system(size: 13))
-                            .foregroundStyle(Theme.textSecondary)
-                            .lineLimit(1)
-                    }
-                }
+                scoreTile(rating)
+                Text(rating.dish.displayName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(2)
                 Spacer(minLength: 8)
-                if rating.photoPath != nil {
-                    Image(systemName: "photo.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.textTertiary)
-                }
-                if let score = rating.score {
-                    Text("\(score)")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(minWidth: 36, minHeight: 28)
-                        .padding(.horizontal, 8)
-                        .background(scoreGradient(Double(score)))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.textTertiary.opacity(0.5))
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())
@@ -351,6 +316,57 @@ struct RestaurantCard: View {
                     Label("Delete", systemImage: "trash")
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func scoreTile(_ rating: RatingResponse) -> some View {
+        ZStack {
+            if let path = rating.photoPath, let url = dishPhotoURL(path: path) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().scaledToFill()
+                    default:
+                        tileFill(rating)
+                    }
+                }
+                Color.black.opacity(0.22)
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.45)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+            } else {
+                tileFill(rating)
+            }
+
+            if let score = rating.score {
+                Text("\(score)")
+                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .monospacedDigit()
+                    .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+            }
+        }
+        .frame(width: 54, height: 54)
+        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder
+    private func tileFill(_ rating: RatingResponse) -> some View {
+        if let score = rating.score {
+            scoreGradient(Double(score))
+        } else {
+            LinearGradient(
+                colors: [Theme.surfaceElevated, Theme.surface],
+                startPoint: .top,
+                endPoint: .bottom
+            )
         }
     }
 }

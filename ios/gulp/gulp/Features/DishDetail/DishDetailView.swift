@@ -46,6 +46,7 @@ struct DishDetailView: View {
         .toolbarBackground(Theme.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .hidesAppTabBar()
         .task { await viewModel.load() }
         .refreshable { await viewModel.load() }
         .sheet(item: $editingRating, onDismiss: { Task { await viewModel.load() } }) { rating in
