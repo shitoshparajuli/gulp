@@ -148,6 +148,23 @@ final class AddRatingViewModel {
         existingPhotoPath = nil
     }
 
+    /// Clears everything specific to the dish just rated so the user can rate
+    /// another at the same restaurant. The restaurant selection is intentionally
+    /// kept. Synchronous so callers can batch it with the navigation pop (no
+    /// intermediate frame of the score screen showing reset values); refresh the
+    /// dish list separately with `loadDishes()`.
+    func clearForNextDish() {
+        selectedPhoto = nil
+        existingPhotoPath = nil
+        pickedDish = nil
+        newDishName = ""
+        newDishCuisine = ""
+        score = 8
+        notes = ""
+        editingRatingId = nil
+        errorMessage = nil
+    }
+
     // MARK: - Save
 
     func save() async -> Bool {

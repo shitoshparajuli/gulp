@@ -2,9 +2,9 @@ import SwiftUI
 
 struct RestaurantPickerStep: View {
     @Bindable var viewModel: AddRatingViewModel
+    @Binding var path: [AddRatingStep]
     @State private var searchService = RestaurantSearchService()
     @State private var query: String = ""
-    @State private var navigateToPhoto = false
 
     var body: some View {
         ZStack {
@@ -24,9 +24,6 @@ struct RestaurantPickerStep: View {
                     suggestionsList
                 }
             }
-        }
-        .navigationDestination(isPresented: $navigateToPhoto) {
-            PhotoStep(viewModel: viewModel)
         }
     }
 
@@ -137,7 +134,7 @@ struct RestaurantPickerStep: View {
             let place = try await searchService.resolve(suggestion)
             await viewModel.selectRestaurant(place)
             if viewModel.pickedRestaurantId != nil {
-                navigateToPhoto = true
+                path.append(.photo)
             }
         } catch {
             viewModel.errorMessage = error.localizedDescription

@@ -3,10 +3,10 @@ import PhotosUI
 
 struct PhotoStep: View {
     @Bindable var viewModel: AddRatingViewModel
+    @Binding var path: [AddRatingStep]
     @State private var photoItem: PhotosPickerItem?
     @State private var showCamera = false
     @State private var showLibrary = false
-    @State private var navigateToDish = false
 
     private var hasPhoto: Bool {
         viewModel.selectedPhoto != nil || viewModel.existingPhotoPath != nil
@@ -38,13 +38,10 @@ struct PhotoStep: View {
         .toolbar {
             if !hasPhoto {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Skip") { navigateToDish = true }
+                    Button("Skip") { path.append(.dish) }
                         .foregroundStyle(Theme.accent)
                 }
             }
-        }
-        .navigationDestination(isPresented: $navigateToDish) {
-            DishPickerStep(viewModel: viewModel)
         }
         .fullScreenCover(isPresented: $showCamera) {
             CameraPicker { viewModel.selectedPhoto = $0 }
@@ -211,7 +208,7 @@ struct PhotoStep: View {
 
     private var bottomBar: some View {
         Button {
-            navigateToDish = true
+            path.append(.dish)
         } label: {
             HStack(spacing: 8) {
                 Text(hasPhoto ? "Continue" : "Skip for now")

@@ -23,15 +23,26 @@ struct RatingsView: View {
                     header
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, viewModel.groups.isEmpty ? 24 : 16)
+
+                    if !viewModel.groups.isEmpty {
+                        SearchField(
+                            text: $viewModel.searchText,
+                            placeholder: readOnly ? "Filter ratings" : "Filter your ratings"
+                        )
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 22)
+                    }
 
                     if viewModel.isLoading && viewModel.groups.isEmpty {
                         loadingState
                     } else if viewModel.groups.isEmpty {
                         emptyState
+                    } else if viewModel.filteredGroups.isEmpty {
+                        noMatchesState
                     } else {
                         LazyVStack(spacing: 24) {
-                            ForEach(viewModel.groups) { group in
+                            ForEach(viewModel.filteredGroups) { group in
                                 RestaurantCard(
                                     group: group,
                                     readOnly: readOnly,
@@ -197,6 +208,21 @@ struct RatingsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 80)
+    }
+
+    private var noMatchesState: some View {
+        VStack(spacing: 8) {
+            Text("No matches")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+            Text("No dishes or places match “\(viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines))”.")
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 32)
+        .padding(.top, 60)
     }
 }
 

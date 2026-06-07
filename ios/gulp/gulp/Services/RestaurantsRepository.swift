@@ -28,6 +28,19 @@ struct RestaurantsRepository {
         return rows.first?.id
     }
 
+    /// Restaurants whose name matches `query` (case-insensitive substring),
+    /// alphabetical. `query` is sanitized for the `ilike` pattern via `ilikeEscaped`.
+    func search(matching query: String, limit: Int = 15) async throws -> [RestaurantResponse] {
+        try await supabase
+            .from("restaurants")
+            .select("id, name, address")
+            .ilike("name", pattern: "%\(query.ilikeEscaped)%")
+            .order("name")
+            .limit(limit)
+            .execute()
+            .value
+    }
+
     /// Inserts a restaurant and returns its new id.
     func insert(place: PlaceResult, addedBy userID: UUID) async throws -> UUID {
         let inserted: IDOnly = try await supabase

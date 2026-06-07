@@ -99,6 +99,19 @@ All three modes share `AddRatingViewModel`. Key methods:
 - `selectExistingDish(_ dish: DishOption)` — sets `pickedDish` AND checks if the user already has an active rating for this dish; if so, **switches the flow into edit mode** by setting `editingRatingId`, prefilling score/notes/photoPath. Save then updates instead of inserts.
 - `save()` — branches on `editingRatingId`: update existing rating, or insert (creating the dish if it's new). Uploads `selectedPhoto` to Storage first if present, otherwise keeps `existingPhotoPath`.
 
+## Search (two scopes, one mental model)
+
+Both scopes share the `SearchField` component (`Features/Search/SearchField.swift`):
+
+- **My Ratings filter** (Profile → `RatingsView`): a pure **client-side** filter, no network. `RatingsViewModel.searchText` drives a `filteredGroups` computed over the already-loaded `groups` — a restaurant survives if its name matches (keeps all dishes) or it has matching dishes (keeps just those). Same component also filters other users' lists in read-only mode.
+- **Global search** (Home → `Features/Search/SearchView` + `SearchViewModel`): a dedicated full-screen page pushed from a tappable bar on `HomeView`, `.hidesAppTabBar()`. Searches **everything** — dishes ranked by community average + restaurants by name — via two parallel queries, debounced 250ms with `.task(id: searchText)` (cancellation during the sleep is the debounce). Results push into `DishDetailView` / `RestaurantDetailView`. Scope is dishes + restaurants; no people yet, but `SearchView` is laid out to drop in a third section.
+
+**Repository methods** (don't inline these in a VM):
+- `DishesRepository.search(matching:limit:)` → `[DishSearchRow]` (dish + its restaurant + nested ratings). `SearchViewModel.ranked(_:)` aggregates community avg/count and sorts rated-first by avg, reusing `RestaurantDetailViewModel`'s logic. The UI model `DishSearchResult` lives in `Features/Search/SearchModels.swift`.
+- `RestaurantsRepository.search(matching:limit:)` → `[RestaurantResponse]`.
+
+**`ilike` gotcha**: supabase-swift's `.ilike(col, pattern:)` takes the SQL `%…%` wildcard (**not** PostgREST's `*`). User input is sanitized through `String.ilikeEscaped` (`Services/String+ILike.swift`), which strips `% _ , ( ) *` so text matches literally and an all-wildcard query can't match everything. `SearchViewModel` also guards `q.ilikeEscaped.count >= 2`.
+
 ## Build & test
 
 ```bash

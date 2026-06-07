@@ -26,6 +26,32 @@ struct DishWithRatings: Decodable, Identifiable {
     }
 }
 
+/// A name-matched dish with its restaurant and every rating inlined — the shape
+/// global search decodes, then ranks by community average.
+struct DishSearchRow: Decodable, Identifiable {
+    let id: UUID
+    let displayName: String
+    let cuisine: String?
+    let restaurant: RestaurantResponse
+    let ratings: [Rating]
+
+    struct Rating: Decodable {
+        let score: Int?
+        let deletedAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case score
+            case deletedAt = "deleted_at"
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, cuisine, ratings
+        case displayName = "display_name"
+        case restaurant = "restaurants"
+    }
+}
+
 /// Reads and writes against the `dishes` table. Dishes are a shared,
 /// append-only resource owned by a restaurant.
 struct DishesRepository {
@@ -57,6 +83,19 @@ struct DishesRepository {
             .from("dishes")
             .select("id, display_name, cuisine, ratings(score, user_id, deleted_at)")
             .eq("restaurant_id", value: restaurantID)
+            .execute()
+            .value
+    }
+
+    /// Dishes whose name matches `query` (case-insensitive substring), each with
+    /// its restaurant and every rating inlined so the caller can rank by community
+    /// average. `query` is sanitized for the `ilike` pattern via `ilikeEscaped`.
+    func search(matching query: String, limit: Int = 30) async throws -> [DishSearchRow] {
+        try await supabase
+            .from("dishes")
+            .select("id, display_name, cuisine, restaurants(id, name, address), ratings(score, deleted_at)")
+            .ilike("display_name", pattern: "%\(query.ilikeEscaped)%")
+            .limit(limit)
             .execute()
             .value
     }

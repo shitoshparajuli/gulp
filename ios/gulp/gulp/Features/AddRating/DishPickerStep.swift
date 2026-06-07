@@ -2,9 +2,9 @@ import SwiftUI
 
 struct DishPickerStep: View {
     @Bindable var viewModel: AddRatingViewModel
+    @Binding var path: [AddRatingStep]
     @State private var addingNew = false
     @FocusState private var newDishFocused: Bool
-    @State private var navigateToScore = false
 
     var body: some View {
         ZStack {
@@ -65,9 +65,6 @@ struct DishPickerStep: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .navigationDestination(isPresented: $navigateToScore) {
-            ScoreInputStep(viewModel: viewModel)
-        }
     }
 
     private var restaurantHeader: some View {
@@ -182,7 +179,7 @@ struct DishPickerStep: View {
     }
 
     private var continueButton: some View {
-        Button { navigateToScore = true } label: {
+        Button { path.append(.score) } label: {
             Text(viewModel.editingRatingId != nil ? "Edit Rating" : "Continue")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.black)

@@ -19,13 +19,20 @@ struct LoginView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                VStack(spacing: 16) {
-                    Text("gulp")
-                        .font(.system(size: 64, weight: .bold, design: .rounded))
-                        .foregroundStyle(Theme.textPrimary)
-                    Text("Rate every bite.")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(Theme.textSecondary)
+                VStack(spacing: 24) {
+                    Image("GulpLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 100, height: 100)
+                        .shadow(color: Theme.accent.opacity(0.4), radius: 24, x: 0, y: 8)
+                    VStack(spacing: 8) {
+                        Text("gulp")
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .foregroundStyle(Theme.textPrimary)
+                        Text("Rate every bite.")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(Theme.textSecondary)
+                    }
                 }
 
                 Spacer()

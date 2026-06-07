@@ -13,7 +13,11 @@ struct HomeView: View {
                     header
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
-                        .padding(.bottom, 26)
+                        .padding(.bottom, 18)
+
+                    searchBar
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 24)
 
                     if viewModel.isLoading && viewModel.feed.isEmpty && viewModel.suggestions.isEmpty {
                         loadingState
@@ -42,6 +46,31 @@ struct HomeView: View {
         Text("Home")
             .font(.system(size: 34, weight: .bold))
             .foregroundStyle(Theme.textPrimary)
+    }
+
+    // Looks like SearchField but is a link — tapping opens the full-screen search
+    // page rather than editing in place.
+    private var searchBar: some View {
+        NavigationLink {
+            SearchView()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.textTertiary)
+                Text("Search dishes & restaurants")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.textTertiary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Theme.surface)
+            .overlay { Capsule().stroke(Theme.hairline, lineWidth: 1) }
+            .clipShape(Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private var loadingState: some View {

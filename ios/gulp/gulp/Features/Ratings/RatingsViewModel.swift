@@ -6,10 +6,29 @@ import Supabase
 @Observable
 class RatingsViewModel {
     var groups: [RestaurantGroup] = []
+    var searchText = ""
     var isLoading = false
     var errorMessage: String?
 
     private let ratings = RatingsRepository.shared
+
+    /// `groups` filtered by `searchText` (instant, in-memory). A restaurant survives
+    /// if its name matches (keeping all its dishes) or if it has dishes whose names
+    /// match (keeping only those). Empty query returns everything.
+    var filteredGroups: [RestaurantGroup] {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return groups }
+        return groups.compactMap { group in
+            if group.restaurant.name.localizedCaseInsensitiveContains(q) {
+                return group
+            }
+            let matches = group.ratings.filter {
+                $0.dish.displayName.localizedCaseInsensitiveContains(q)
+            }
+            guard !matches.isEmpty else { return nil }
+            return RestaurantGroup(restaurant: group.restaurant, ratings: matches)
+        }
+    }
 
     func load(userId targetUserId: UUID? = nil) async {
         isLoading = true

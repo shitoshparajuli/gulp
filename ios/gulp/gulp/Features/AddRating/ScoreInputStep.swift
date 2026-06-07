@@ -3,11 +3,19 @@ import PhotosUI
 
 struct ScoreInputStep: View {
     @Bindable var viewModel: AddRatingViewModel
+    @Binding var path: [AddRatingStep]
+    /// Whether to offer "Save & add another" (false when editing a single rating).
+    var allowAddAnother: Bool = false
+    /// The navigation path to return to after "Save & add another".
+    var loopBase: [AddRatingStep] = []
     @Environment(\.dismissAddFlow) private var dismissAddFlow
 
     @State private var photoItem: PhotosPickerItem?
     @State private var showCamera = false
     @State private var showLibrary = false
+    @State private var activeSave: SaveAction?
+
+    private enum SaveAction { case finish, another }
 
     var body: some View {
         ZStack {
@@ -51,7 +59,7 @@ struct ScoreInputStep: View {
 
             VStack {
                 Spacer()
-                saveButton
+                actionBar
                     .padding(.horizontal, 20)
                     .padding(.bottom, 24)
             }
@@ -218,19 +226,38 @@ struct ScoreInputStep: View {
         .elevatedCard(cornerRadius: 16)
     }
 
-    private var saveButton: some View {
+    @ViewBuilder
+    private var actionBar: some View {
+        VStack(spacing: 10) {
+            if allowAddAnother {
+                addAnotherButton
+            }
+            finishButton
+        }
+    }
+
+    private var finishTitle: String {
+        if allowAddAnother { return "Save & finish" }
+        return viewModel.isEditing ? "Save Changes" : "Save Rating"
+    }
+
+    private var finishButton: some View {
         Button {
+            activeSave = .finish
             Task {
                 let ok = await viewModel.save()
-                if ok { dismissAddFlow?() }
+                if ok {
+                    dismissAddFlow?()
+                } else {
+                    activeSave = nil
+                }
             }
         } label: {
             HStack(spacing: 8) {
-                if viewModel.isWorking {
-                    ProgressView()
-                        .tint(.black)
+                if activeSave == .finish {
+                    ProgressView().tint(.black)
                 }
-                Text(viewModel.isWorking ? "Saving..." : (viewModel.isEditing ? "Save Changes" : "Save Rating"))
+                Text(activeSave == .finish ? "Saving..." : finishTitle)
                     .font(.system(size: 16, weight: .semibold))
             }
             .foregroundStyle(.black)
@@ -239,6 +266,44 @@ struct ScoreInputStep: View {
             .background(Theme.accent)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .disabled(viewModel.isWorking)
+        .disabled(activeSave != nil)
+    }
+
+    private var addAnotherButton: some View {
+        Button {
+            activeSave = .another
+            Task {
+                let ok = await viewModel.save()
+                guard ok else { activeSave = nil; return }
+                // Clear the just-rated dish and pop back in one update so the
+                // score screen never flashes its reset values, then refresh the
+                // dish list (the dish just rated moves to "already ordered").
+                viewModel.clearForNextDish()
+                path = loopBase
+                activeSave = nil
+                await viewModel.loadDishes()
+            }
+        } label: {
+            HStack(spacing: 8) {
+                if activeSave == .another {
+                    ProgressView().tint(Theme.accent)
+                } else {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                Text(activeSave == .another ? "Saving..." : "Save & add another")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(Theme.textPrimary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Theme.surface)
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Theme.hairline, lineWidth: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .disabled(activeSave != nil)
     }
 }
