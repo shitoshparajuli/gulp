@@ -28,6 +28,10 @@ struct HomeView: View {
                             ForEach(viewModel.feed) { item in
                                 FeedCard(item: item)
                             }
+                            if !viewModel.suggestions.isEmpty {
+                                followSuggestionsCard
+                                    .padding(.top, 8)
+                            }
                         }
                         .padding(.horizontal, 18)
                         .padding(.top, 4)
@@ -98,46 +102,50 @@ struct HomeView: View {
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.textSecondary)
             }
-            .padding(.top, 60)
+            .frame(maxWidth: .infinity, minHeight: 360, alignment: .center)
 
             if !viewModel.suggestions.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("SUGGESTED")
-                        .font(.system(size: 10, weight: .heavy))
-                        .tracking(1.2)
-                        .foregroundStyle(Theme.textTertiary)
-                        .padding(.horizontal, 18)
-                        .padding(.top, 16)
-                        .padding(.bottom, 10)
-
-                    ForEach(Array(viewModel.suggestions.enumerated()), id: \.element.id) { index, profile in
-                        SuggestionRow(
-                            profile: profile,
-                            isFollowing: viewModel.followingIds.contains(profile.id),
-                            onToggle: {
-                                Task {
-                                    if viewModel.followingIds.contains(profile.id) {
-                                        await viewModel.unfollow(profile)
-                                    } else {
-                                        await viewModel.follow(profile)
-                                    }
-                                }
-                            }
-                        )
-                        if index < viewModel.suggestions.count - 1 {
-                            Rectangle()
-                                .fill(Theme.hairline)
-                                .frame(height: 1)
-                                .padding(.leading, 18)
-                        }
-                    }
-                    Spacer().frame(height: 8)
-                }
-                .elevatedCard(cornerRadius: 20)
-                .padding(.horizontal, 18)
+                followSuggestionsCard
+                    .padding(.horizontal, 18)
             }
         }
         .padding(.bottom, 80)
+    }
+
+    private var followSuggestionsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("WHO TO FOLLOW")
+                .font(.system(size: 10, weight: .heavy))
+                .tracking(1.2)
+                .foregroundStyle(Theme.textTertiary)
+                .padding(.horizontal, 18)
+                .padding(.top, 16)
+                .padding(.bottom, 10)
+
+            ForEach(Array(viewModel.suggestions.enumerated()), id: \.element.id) { index, profile in
+                SuggestionRow(
+                    profile: profile,
+                    isFollowing: viewModel.followingIds.contains(profile.id),
+                    onToggle: {
+                        Task {
+                            if viewModel.followingIds.contains(profile.id) {
+                                await viewModel.unfollow(profile)
+                            } else {
+                                await viewModel.follow(profile)
+                            }
+                        }
+                    }
+                )
+                if index < viewModel.suggestions.count - 1 {
+                    Rectangle()
+                        .fill(Theme.hairline)
+                        .frame(height: 1)
+                        .padding(.leading, 18)
+                }
+            }
+            Spacer().frame(height: 8)
+        }
+        .elevatedCard(cornerRadius: 20)
     }
 }
 

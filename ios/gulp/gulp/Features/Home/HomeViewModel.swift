@@ -28,21 +28,18 @@ final class HomeViewModel {
 
             if followingIds.isEmpty {
                 feed = []
-                await loadSuggestions(currentUserId: userId)
-                return
+            } else {
+                let ratingRows = try await ratings.feed(fromUsers: Array(followingIds), limit: 50)
+                let userIds = Array(Set(ratingRows.map(\.userId)))
+                let profiles = try await profilesRepo.profiles(ids: userIds)
+                let profileMap = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
+                feed = ratingRows.compactMap { row in
+                    guard let profile = profileMap[row.userId] else { return nil }
+                    return FeedItem(rating: row, profile: profile)
+                }
             }
 
-            let ratingRows = try await ratings.feed(fromUsers: Array(followingIds), limit: 50)
-
-            let userIds = Array(Set(ratingRows.map(\.userId)))
-            let profiles = try await profilesRepo.profiles(ids: userIds)
-
-            let profileMap = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
-            feed = ratingRows.compactMap { row in
-                guard let profile = profileMap[row.userId] else { return nil }
-                return FeedItem(rating: row, profile: profile)
-            }
-            suggestions = []
+            await loadSuggestions(currentUserId: userId)
         } catch {
             if error.isCancellation { return }
             errorMessage = error.localizedDescription
@@ -51,11 +48,13 @@ final class HomeViewModel {
 
     private func loadSuggestions(currentUserId: UUID) async {
         do {
-            let pool = try await profilesRepo.recent(limit: 20)
-            suggestions = pool
-                .filter { $0.id != currentUserId && !followingIds.contains($0.id) }
-                .prefix(8)
-                .map { $0 }
+            let pool = try await profilesRepo.recent(limit: 50)
+            suggestions = Array(
+                pool
+                    .filter { $0.id != currentUserId && !followingIds.contains($0.id) }
+                    .shuffled()
+                    .prefix(5)
+            )
         } catch {
             if error.isCancellation { return }
             errorMessage = error.localizedDescription

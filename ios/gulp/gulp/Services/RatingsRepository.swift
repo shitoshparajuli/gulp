@@ -83,12 +83,16 @@ struct RatingsRepository {
     }
 
     /// Recent ratings from a set of users — the social feed, newest first.
+    /// Only returns activity from the last 2 weeks.
     func feed(fromUsers userIDs: [UUID], limit: Int) async throws -> [FeedRatingRow] {
         guard !userIDs.isEmpty else { return [] }
+        let twoWeeksAgo = Calendar.current.date(byAdding: .weekOfYear, value: -2, to: Date())!
+        let sinceStr = ISO8601DateFormatter().string(from: twoWeeksAgo)
         return try await supabase
             .from("ratings")
             .select("id, user_id, score, notes, photo_path, created_at, dishes(id, display_name, cuisine, restaurants(id, name, address))")
             .in("user_id", values: userIDs)
+            .gte("created_at", value: sinceStr)
             .order("created_at", ascending: false)
             .limit(limit)
             .execute()
