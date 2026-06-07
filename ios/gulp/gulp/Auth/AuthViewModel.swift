@@ -8,8 +8,36 @@ import Supabase
 @Observable
 class AuthViewModel {
     var isSignedIn = false
+    var isInitializing = true
     var username: String = ""
     var errorMessage: String?
+
+    func startSessionListener() {
+        Task {
+            for await (event, session) in await supabase.auth.authStateChanges {
+                switch event {
+                case .initialSession:
+                    if let session {
+                        let fetchedUsername = try? await ProfilesRepository.shared.username(for: session.user.id)
+                        username = (fetchedUsername ?? nil) ?? session.user.email ?? "user"
+                        isSignedIn = true
+                    }
+                    isInitializing = false
+                case .signedIn, .tokenRefreshed:
+                    if let session {
+                        let fetchedUsername = try? await ProfilesRepository.shared.username(for: session.user.id)
+                        username = (fetchedUsername ?? nil) ?? session.user.email ?? "user"
+                        isSignedIn = true
+                    }
+                case .signedOut:
+                    isSignedIn = false
+                    username = ""
+                default:
+                    break
+                }
+            }
+        }
+    }
 
     func signInWithGoogle() async {
         guard let rootViewController = UIApplication.shared.connectedScenes

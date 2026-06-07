@@ -8,7 +8,9 @@ struct gulpApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if auth.isSignedIn {
+                if auth.isInitializing {
+                    Color(Theme.background).ignoresSafeArea()
+                } else if auth.isSignedIn {
                     AppRoot(auth: auth)
                 } else {
                     LoginView(auth: auth)
@@ -17,6 +19,9 @@ struct gulpApp: App {
             .preferredColorScheme(.dark)
             .onOpenURL { url in
                 GIDSignIn.sharedInstance.handle(url)
+            }
+            .task {
+                auth.startSessionListener()
             }
         }
     }
