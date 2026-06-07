@@ -11,10 +11,6 @@ class AuthViewModel {
     var username: String = ""
     var errorMessage: String?
 
-    private struct Profile: Decodable {
-        let username: String?
-    }
-
     func signInWithGoogle() async {
         guard let rootViewController = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
@@ -29,15 +25,8 @@ class AuthViewModel {
                 credentials: .init(provider: .google, idToken: idToken)
             )
 
-            let profile = try? await supabase
-                .from("profiles")
-                .select("username")
-                .eq("id", value: session.user.id.uuidString)
-                .single()
-                .execute()
-                .value as Profile
-
-            username = profile?.username ?? session.user.email ?? "user"
+            let fetchedUsername = try? await ProfilesRepository.shared.username(for: session.user.id)
+            username = (fetchedUsername ?? nil) ?? session.user.email ?? "user"
             isSignedIn = true
         } catch {
             errorMessage = error.localizedDescription

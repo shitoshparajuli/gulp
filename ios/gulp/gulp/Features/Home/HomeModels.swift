@@ -39,11 +39,3 @@ struct FeedItem: Identifiable {
 
     var id: UUID { rating.id }
 }
-
-struct FollowRow: Decodable {
-    let followeeId: UUID
-
-    enum CodingKeys: String, CodingKey {
-        case followeeId = "followee_id"
-    }
-}

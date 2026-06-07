@@ -13,26 +13,11 @@ final class DishDetailViewModel {
     var isLoading = false
     var errorMessage: String?
 
+    private let ratings = RatingsRepository.shared
+    private let dishPhotos = DishPhotosRepository.shared
+
     init(dish: DishResponse) {
         self.dish = dish
-    }
-
-    private struct Row: Decodable {
-        let id: UUID
-        let userId: UUID
-        let score: Int?
-        let notes: String?
-        let photoPath: String?
-        let createdAt: Date
-        let deletedAt: Date?
-
-        enum CodingKeys: String, CodingKey {
-            case id, score, notes
-            case userId = "user_id"
-            case photoPath = "photo_path"
-            case createdAt = "created_at"
-            case deletedAt = "deleted_at"
-        }
     }
 
     func load() async {
@@ -41,22 +26,10 @@ final class DishDetailViewModel {
         defer { isLoading = false }
 
         do {
-            let me = try await supabase.auth.session.user.id
+            let me = try await Session.currentUserID()
 
-            let rows: [Row] = try await supabase
-                .from("ratings")
-                .select("id, user_id, score, notes, photo_path, created_at, deleted_at")
-                .eq("dish_id", value: dish.id)
-                .execute()
-                .value
-
-            photos = try await supabase
-                .from("dish_photos")
-                .select("id, photo_path, user_id, created_at")
-                .eq("dish_id", value: dish.id)
-                .order("created_at", ascending: false)
-                .execute()
-                .value
+            let rows = try await ratings.ratings(forDish: dish.id)
+            photos = try await dishPhotos.photos(forDish: dish.id)
 
             let active = rows.filter { $0.deletedAt == nil }
             let scores = active.compactMap(\.score)
@@ -79,6 +52,23 @@ final class DishDetailViewModel {
                 myRating = nil
             }
         } catch {
+            if error.isCancellation { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteRating() async {
+        guard let rating = myRating else { return }
+        do {
+            let affected = try await ratings.softDelete(ids: [rating.id])
+            guard affected > 0 else {
+                errorMessage = "Couldn't delete this rating."
+                return
+            }
+            myRating = nil   // optimistic: flip to the unrated state immediately
+            await load()
+        } catch {
+            if error.isCancellation { return }
             errorMessage = error.localizedDescription
         }
     }

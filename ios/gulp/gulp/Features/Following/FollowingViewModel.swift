@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import Supabase
 
 @MainActor
 @Observable
@@ -10,6 +9,8 @@ final class FollowingViewModel {
     var errorMessage: String?
 
     private var currentUserId: UUID?
+    private let follows = FollowsRepository.shared
+    private let profilesRepo = ProfilesRepository.shared
 
     func load() async {
         isLoading = true
@@ -17,33 +18,21 @@ final class FollowingViewModel {
         defer { isLoading = false }
 
         do {
-            let me = try await supabase.auth.session.user.id
+            let me = try await Session.currentUserID()
             currentUserId = me
 
-            let follows: [FollowRow] = try await supabase
-                .from("follows")
-                .select("followee_id")
-                .eq("follower_id", value: me)
-                .execute()
-                .value
-
-            let ids = follows.map(\.followeeId)
+            let ids = try await follows.followeeIDs(of: me)
             guard !ids.isEmpty else {
                 profiles = []
                 return
             }
 
-            let rows: [ProfileLite] = try await supabase
-                .from("profiles")
-                .select("id, username, display_name, avatar_url")
-                .in("id", values: ids)
-                .execute()
-                .value
-
+            let rows = try await profilesRepo.profiles(ids: ids)
             profiles = rows.sorted {
                 $0.resolvedName.localizedCaseInsensitiveCompare($1.resolvedName) == .orderedAscending
             }
         } catch {
+            if error.isCancellation { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -53,12 +42,7 @@ final class FollowingViewModel {
         let previous = profiles
         profiles.removeAll { $0.id == profile.id }
         do {
-            try await supabase
-                .from("follows")
-                .delete()
-                .eq("follower_id", value: me)
-                .eq("followee_id", value: profile.id)
-                .execute()
+            try await follows.unfollow(follower: me, followee: profile.id)
         } catch {
             profiles = previous
             errorMessage = error.localizedDescription

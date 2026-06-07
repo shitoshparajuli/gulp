@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import Supabase
 
 @MainActor
 @Observable
@@ -11,6 +10,7 @@ final class UserProfileViewModel {
 
     private var currentUserId: UUID?
     let profile: ProfileLite
+    private let follows = FollowsRepository.shared
 
     init(profile: ProfileLite) {
         self.profile = profile
@@ -18,7 +18,7 @@ final class UserProfileViewModel {
 
     func load() async {
         do {
-            let me = try await supabase.auth.session.user.id
+            let me = try await Session.currentUserID()
             currentUserId = me
 
             if me == profile.id {
@@ -27,16 +27,10 @@ final class UserProfileViewModel {
                 return
             }
 
-            let rows: [FollowRow] = try await supabase
-                .from("follows")
-                .select("followee_id")
-                .eq("follower_id", value: me)
-                .eq("followee_id", value: profile.id)
-                .execute()
-                .value
-            isFollowing = !rows.isEmpty
+            isFollowing = try await follows.isFollowing(follower: me, followee: profile.id)
             didLoad = true
         } catch {
+            if error.isCancellation { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -47,21 +41,9 @@ final class UserProfileViewModel {
         isFollowing.toggle()
         do {
             if wasFollowing {
-                try await supabase
-                    .from("follows")
-                    .delete()
-                    .eq("follower_id", value: me)
-                    .eq("followee_id", value: profile.id)
-                    .execute()
+                try await follows.unfollow(follower: me, followee: profile.id)
             } else {
-                struct Insert: Encodable {
-                    let follower_id: UUID
-                    let followee_id: UUID
-                }
-                try await supabase
-                    .from("follows")
-                    .insert(Insert(follower_id: me, followee_id: profile.id))
-                    .execute()
+                try await follows.follow(follower: me, followee: profile.id)
             }
         } catch {
             isFollowing = wasFollowing

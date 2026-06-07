@@ -5,6 +5,7 @@ struct DishDetailView: View {
     @State private var viewModel: DishDetailViewModel
     @State private var editingRating: RatingResponse?
     @State private var rateExisting: RestaurantResponse?
+    @State private var showDeleteConfirm = false
 
     init(dish: DishResponse) {
         self.dish = dish
@@ -51,6 +52,51 @@ struct DishDetailView: View {
         }
         .sheet(item: $rateExisting, onDismiss: { Task { await viewModel.load() } }) { restaurant in
             AddRatingView(mode: .addToRestaurant(restaurant))
+        }
+        .toolbar {
+            if viewModel.myRating != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            editingRating = viewModel.myRating
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            showDeleteConfirm = true
+                        } label: {
+                            Label("Delete rating", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(Theme.textPrimary)
+                    }
+                }
+            }
+        }
+        .confirmationDialog(
+            "Delete this rating?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                Task { await viewModel.deleteRating() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your rating of \(dish.displayName) will be removed.")
+        }
+        .alert(
+            "Something went wrong",
+            isPresented: .init(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage ?? "")
         }
     }
 

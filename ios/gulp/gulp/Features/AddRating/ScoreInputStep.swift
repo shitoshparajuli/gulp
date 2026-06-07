@@ -6,6 +6,8 @@ struct ScoreInputStep: View {
     @Environment(\.dismissAddFlow) private var dismissAddFlow
 
     @State private var photoItem: PhotosPickerItem?
+    @State private var showCamera = false
+    @State private var showLibrary = false
 
     var body: some View {
         ZStack {
@@ -58,6 +60,11 @@ struct ScoreInputStep: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Theme.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPicker { viewModel.selectedPhoto = $0 }
+                .ignoresSafeArea()
+        }
+        .photosPicker(isPresented: $showLibrary, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
             Task {
@@ -76,19 +83,20 @@ struct ScoreInputStep: View {
 
     @ViewBuilder
     private var editPhotoStrip: some View {
-        PhotosPicker(selection: $photoItem, matching: .images) {
+        PhotoSourceMenu(onCamera: { showCamera = true }, onLibrary: { showLibrary = true }) {
             HStack(spacing: 12) {
                 photoThumbnail
                 VStack(alignment: .leading, spacing: 2) {
                     Text(hasAnyPhoto ? "Replace photo" : "Add a photo")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
-                    Text(hasAnyPhoto ? "Tap to pick a different one" : "Pick one from your library")
+                    Text(hasAnyPhoto ? "Take a new one or pick from your library"
+                                     : "Snap one or pick from your library")
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.textSecondary)
                 }
                 Spacer()
-                Image(systemName: "photo.on.rectangle.angled")
+                Image(systemName: "camera.fill")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.accent)
             }

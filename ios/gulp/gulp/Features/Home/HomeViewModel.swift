@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import Supabase
 
 @MainActor
 @Observable
@@ -12,6 +11,9 @@ final class HomeViewModel {
     var errorMessage: String?
 
     private var currentUserId: UUID?
+    private let follows = FollowsRepository.shared
+    private let profilesRepo = ProfilesRepository.shared
+    private let ratings = RatingsRepository.shared
 
     func load() async {
         isLoading = true
@@ -19,16 +21,10 @@ final class HomeViewModel {
         defer { isLoading = false }
 
         do {
-            let userId = try await supabase.auth.session.user.id
+            let userId = try await Session.currentUserID()
             currentUserId = userId
 
-            let follows: [FollowRow] = try await supabase
-                .from("follows")
-                .select("followee_id")
-                .eq("follower_id", value: userId)
-                .execute()
-                .value
-            followingIds = Set(follows.map(\.followeeId))
+            followingIds = Set(try await follows.followeeIDs(of: userId))
 
             if followingIds.isEmpty {
                 feed = []
@@ -36,49 +32,32 @@ final class HomeViewModel {
                 return
             }
 
-            let ratings: [FeedRatingRow] = try await supabase
-                .from("ratings")
-                .select("id, user_id, score, notes, photo_path, created_at, dishes(id, display_name, cuisine, restaurants(id, name, address))")
-                .in("user_id", values: Array(followingIds))
-                .order("created_at", ascending: false)
-                .limit(50)
-                .execute()
-                .value
+            let ratingRows = try await ratings.feed(fromUsers: Array(followingIds), limit: 50)
 
-            let userIds = Array(Set(ratings.map(\.userId)))
-            let profiles: [ProfileLite] = userIds.isEmpty ? [] : try await supabase
-                .from("profiles")
-                .select("id, username, display_name, avatar_url")
-                .in("id", values: userIds)
-                .execute()
-                .value
+            let userIds = Array(Set(ratingRows.map(\.userId)))
+            let profiles = try await profilesRepo.profiles(ids: userIds)
 
             let profileMap = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
-            feed = ratings.compactMap { row in
+            feed = ratingRows.compactMap { row in
                 guard let profile = profileMap[row.userId] else { return nil }
                 return FeedItem(rating: row, profile: profile)
             }
             suggestions = []
         } catch {
+            if error.isCancellation { return }
             errorMessage = error.localizedDescription
         }
     }
 
     private func loadSuggestions(currentUserId: UUID) async {
         do {
-            let pool: [ProfileLite] = try await supabase
-                .from("profiles")
-                .select("id, username, display_name, avatar_url")
-                .order("created_at", ascending: false)
-                .limit(20)
-                .execute()
-                .value
-
+            let pool = try await profilesRepo.recent(limit: 20)
             suggestions = pool
                 .filter { $0.id != currentUserId && !followingIds.contains($0.id) }
                 .prefix(8)
                 .map { $0 }
         } catch {
+            if error.isCancellation { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -88,14 +67,7 @@ final class HomeViewModel {
         let previous = followingIds
         followingIds.insert(profile.id)
         do {
-            struct Insert: Encodable {
-                let follower_id: UUID
-                let followee_id: UUID
-            }
-            try await supabase
-                .from("follows")
-                .insert(Insert(follower_id: me, followee_id: profile.id))
-                .execute()
+            try await follows.follow(follower: me, followee: profile.id)
             await load()
         } catch {
             followingIds = previous
@@ -108,12 +80,7 @@ final class HomeViewModel {
         let previous = followingIds
         followingIds.remove(profile.id)
         do {
-            try await supabase
-                .from("follows")
-                .delete()
-                .eq("follower_id", value: me)
-                .eq("followee_id", value: profile.id)
-                .execute()
+            try await follows.unfollow(follower: me, followee: profile.id)
             await load()
         } catch {
             followingIds = previous

@@ -89,16 +89,9 @@ struct ProfileView: View {
     }
 
     private func loadFollowingCount() async {
-        struct Row: Decodable { let followee_id: UUID }
         do {
-            let me = try await supabase.auth.session.user.id
-            let rows: [Row] = try await supabase
-                .from("follows")
-                .select("followee_id")
-                .eq("follower_id", value: me)
-                .execute()
-                .value
-            followingCount = rows.count
+            let me = try await Session.currentUserID()
+            followingCount = try await FollowsRepository.shared.followeeIDs(of: me).count
         } catch {
             // silent: chip just shows 0
         }

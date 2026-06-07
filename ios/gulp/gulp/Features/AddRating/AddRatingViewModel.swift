@@ -15,42 +15,13 @@ struct DishOption: Identifiable, Decodable, Hashable {
     }
 }
 
-private struct IDOnly: Decodable { let id: UUID }
-
-private struct NewRestaurant: Encodable {
-    let place_id: String
-    let name: String
-    let latitude: Double
-    let longitude: Double
-    let address: String?
-    let added_by: String
-}
-
-private struct NewDish: Encodable {
-    let restaurant_id: String
-    let display_name: String
-    let cuisine: String?
-    let added_by: String
-}
-
-private struct NewRating: Encodable {
-    let user_id: String
-    let dish_id: String
-    let score: Int
-    let notes: String?
-    let photo_path: String?
-}
-
-private struct RatingUpdate: Encodable {
-    let score: Int
-    let notes: String?
-    let photo_path: String?
-    let updated_at: String
-}
-
 @MainActor
 @Observable
 final class AddRatingViewModel {
+    private let restaurants = RestaurantsRepository.shared
+    private let dishesRepo = DishesRepository.shared
+    private let ratings = RatingsRepository.shared
+
     var pickedRestaurant: PlaceResult?
     var pickedRestaurantId: UUID?
     var existingDishes: [DishOption] = []
@@ -117,35 +88,8 @@ final class AddRatingViewModel {
         defer { isWorking = false }
 
         do {
-            let userId = try await supabase.auth.session.user.id
-
-            let existing: [IDOnly] = try await supabase
-                .from("restaurants")
-                .select("id")
-                .eq("place_id", value: place.id)
-                .execute()
-                .value
-
-            if let first = existing.first {
-                pickedRestaurantId = first.id
-            } else {
-                let inserted: IDOnly = try await supabase
-                    .from("restaurants")
-                    .insert(NewRestaurant(
-                        place_id: place.id,
-                        name: place.name,
-                        latitude: place.latitude,
-                        longitude: place.longitude,
-                        address: place.address,
-                        added_by: userId.uuidString
-                    ))
-                    .select("id")
-                    .single()
-                    .execute()
-                    .value
-                pickedRestaurantId = inserted.id
-            }
-
+            let userId = try await Session.currentUserID()
+            pickedRestaurantId = try await restaurants.upsert(place: place, addedBy: userId)
             await loadDishes()
         } catch {
             errorMessage = error.localizedDescription
@@ -155,14 +99,7 @@ final class AddRatingViewModel {
     func loadDishes() async {
         guard let restaurantId = pickedRestaurantId else { return }
         do {
-            let allDishes: [DishOption] = try await supabase
-                .from("dishes")
-                .select("id, display_name, cuisine")
-                .eq("restaurant_id", value: restaurantId)
-                .order("display_name")
-                .execute()
-                .value
-
+            let allDishes = try await dishesRepo.dishes(forRestaurant: restaurantId)
             existingDishes = allDishes
 
             guard !allDishes.isEmpty else {
@@ -171,25 +108,12 @@ final class AddRatingViewModel {
                 return
             }
 
-            let userId = try await supabase.auth.session.user.id
-            let dishIds = allDishes.map(\.id)
-
-            struct RatedRow: Decodable {
-                let dishId: UUID
-                enum CodingKeys: String, CodingKey { case dishId = "dish_id" }
-            }
-            let mine: [RatedRow] = try await supabase
-                .from("ratings")
-                .select("dish_id")
-                .eq("user_id", value: userId)
-                .in("dish_id", values: dishIds)
-                .execute()
-                .value
-
-            let ratedIds = Set(mine.map(\.dishId))
+            let userId = try await Session.currentUserID()
+            let ratedIds = try await ratings.myRatedDishIDs(in: allDishes.map(\.id), userID: userId)
             myRatedDishes = allDishes.filter { ratedIds.contains($0.id) }
             otherDishes = allDishes.filter { !ratedIds.contains($0.id) }
         } catch {
+            if error.isCancellation { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -203,16 +127,8 @@ final class AddRatingViewModel {
         defer { isWorking = false }
 
         do {
-            let userId = try await supabase.auth.session.user.id
-            let rows: [RatingResponse] = try await supabase
-                .from("ratings")
-                .select("id, score, notes, photo_path, created_at, deleted_at, dishes(id, display_name, cuisine, restaurants(id, name, address))")
-                .eq("user_id", value: userId)
-                .eq("dish_id", value: dish.id)
-                .execute()
-                .value
-
-            if let existing = rows.first(where: { $0.deletedAt == nil }) {
+            let userId = try await Session.currentUserID()
+            if let existing = try await ratings.myActiveRating(forDish: dish.id, userID: userId) {
                 editingRatingId = existing.id
                 score = existing.score ?? 8
                 notes = existing.notes ?? ""
@@ -240,7 +156,7 @@ final class AddRatingViewModel {
         defer { isWorking = false }
 
         do {
-            let userId = try await supabase.auth.session.user.id
+            let userId = try await Session.currentUserID()
 
             var photoPath: String? = existingPhotoPath
             if let image = selectedPhoto {
@@ -251,17 +167,13 @@ final class AddRatingViewModel {
             let cleanNotes: String? = trimmedNotes.isEmpty ? nil : trimmedNotes
 
             if let editingId = editingRatingId {
-                try await supabase
-                    .from("ratings")
-                    .update(RatingUpdate(
-                        score: score,
-                        notes: cleanNotes,
-                        photo_path: photoPath,
-                        updated_at: ISO8601DateFormatter().string(from: Date())
-                    ))
-                    .eq("id", value: editingId)
-                    .eq("user_id", value: userId)
-                    .execute()
+                try await ratings.update(
+                    id: editingId,
+                    userID: userId,
+                    score: score,
+                    notes: cleanNotes,
+                    photoPath: photoPath
+                )
             } else {
                 guard let restaurantId = pickedRestaurantId else { return false }
 
@@ -270,31 +182,21 @@ final class AddRatingViewModel {
                     dishId = picked.id
                 } else {
                     let cuisine = newDishCuisine.trimmingCharacters(in: .whitespaces)
-                    let inserted: IDOnly = try await supabase
-                        .from("dishes")
-                        .insert(NewDish(
-                            restaurant_id: restaurantId.uuidString,
-                            display_name: newDishName.trimmingCharacters(in: .whitespaces),
-                            cuisine: cuisine.isEmpty ? nil : cuisine,
-                            added_by: userId.uuidString
-                        ))
-                        .select("id")
-                        .single()
-                        .execute()
-                        .value
-                    dishId = inserted.id
+                    dishId = try await dishesRepo.insert(
+                        restaurantID: restaurantId,
+                        displayName: newDishName.trimmingCharacters(in: .whitespaces),
+                        cuisine: cuisine.isEmpty ? nil : cuisine,
+                        addedBy: userId
+                    )
                 }
 
-                try await supabase
-                    .from("ratings")
-                    .insert(NewRating(
-                        user_id: userId.uuidString,
-                        dish_id: dishId.uuidString,
-                        score: score,
-                        notes: cleanNotes,
-                        photo_path: photoPath
-                    ))
-                    .execute()
+                try await ratings.insert(
+                    dishID: dishId,
+                    userID: userId,
+                    score: score,
+                    notes: cleanNotes,
+                    photoPath: photoPath
+                )
             }
 
             return true

@@ -28,32 +28,10 @@ final class RestaurantDetailViewModel {
     var isLoading = false
     var errorMessage: String?
 
+    private let dishRepo = DishesRepository.shared
+
     init(restaurant: RestaurantResponse) {
         self.restaurant = restaurant
-    }
-
-    private struct DishRow: Decodable {
-        let id: UUID
-        let displayName: String
-        let cuisine: String?
-        let ratings: [RatingInfo]
-
-        enum CodingKeys: String, CodingKey {
-            case id, cuisine, ratings
-            case displayName = "display_name"
-        }
-    }
-
-    private struct RatingInfo: Decodable {
-        let score: Int?
-        let userId: UUID
-        let deletedAt: Date?
-
-        enum CodingKeys: String, CodingKey {
-            case score
-            case userId = "user_id"
-            case deletedAt = "deleted_at"
-        }
     }
 
     var totalRatings: Int {
@@ -92,14 +70,9 @@ final class RestaurantDetailViewModel {
         defer { isLoading = false }
 
         do {
-            let me = try await supabase.auth.session.user.id
+            let me = try await Session.currentUserID()
 
-            let rows: [DishRow] = try await supabase
-                .from("dishes")
-                .select("id, display_name, cuisine, ratings(score, user_id, deleted_at)")
-                .eq("restaurant_id", value: restaurant.id)
-                .execute()
-                .value
+            let rows = try await dishRepo.dishesWithRatings(forRestaurant: restaurant.id)
 
             let aggregates = rows.map { dish -> DishAggregate in
                 let active = dish.ratings.filter { $0.deletedAt == nil }
@@ -130,6 +103,7 @@ final class RestaurantDetailViewModel {
                 }
             }
         } catch {
+            if error.isCancellation { return }
             errorMessage = error.localizedDescription
         }
     }

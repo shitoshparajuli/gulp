@@ -35,8 +35,11 @@ struct RatingsView: View {
                                 RestaurantCard(
                                     group: group,
                                     readOnly: readOnly,
-                                    onEditDish: { editingRating = $0 },
-                                    onDeleteDish: { pendingDelete = .rating($0) },
+                                    // Edit/Delete fire from a context menu; defer the
+                                    // presentation past the menu's dismissal or the
+                                    // sheet/dialog gets swallowed (SwiftUI quirk).
+                                    onEditDish: { rating in afterMenuDismiss { editingRating = rating } },
+                                    onDeleteDish: { rating in afterMenuDismiss { pendingDelete = .rating(rating) } },
                                     onAddDish: { addToRestaurant = group.restaurant },
                                     onRemoveRestaurant: { pendingDelete = .restaurant(group) }
                                 )
@@ -64,12 +67,40 @@ struct RatingsView: View {
             titleVisibility: .visible
         ) {
             Button(deleteActionLabel, role: .destructive) {
-                Task { await performDelete() }
+                // Capture before the binding's dismissal resets pendingDelete,
+                // then run the delete on the (stable) view model directly.
+                let target = pendingDelete
+                pendingDelete = nil
+                Task {
+                    switch target {
+                    case .rating(let r): await viewModel.deleteRating(r)
+                    case .restaurant(let g): await viewModel.removeRestaurant(g)
+                    case .none: break
+                    }
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(deleteMessage)
         }
+        .alert(
+            "Something went wrong",
+            isPresented: .init(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
+    }
+
+    /// Runs `action` after a context menu has had time to dismiss. Presenting a
+    /// sheet or confirmation dialog synchronously from a context-menu button
+    /// races the menu's own dismissal and often no-ops.
+    private func afterMenuDismiss(_ action: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: action)
     }
 
     private var deleteTitle: String {
@@ -94,15 +125,6 @@ struct RatingsView: View {
         case .restaurant(let g): return "All \(g.ratings.count) ratings at \(g.restaurant.name) will be removed from your list."
         case .none: return ""
         }
-    }
-
-    private func performDelete() async {
-        switch pendingDelete {
-        case .rating(let r): await viewModel.deleteRating(r)
-        case .restaurant(let g): await viewModel.removeRestaurant(g)
-        case .none: break
-        }
-        pendingDelete = nil
     }
 
     private var header: some View {
@@ -217,64 +239,68 @@ struct RestaurantCard: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 16) {
+        ZStack(alignment: .topTrailing) {
             NavigationLink {
                 RestaurantDetailView(restaurant: group.restaurant)
             } label: {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(group.restaurant.name.uppercased())
-                        .font(.system(size: 18, weight: .bold))
-                        .tracking(0.5)
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
-
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Theme.textTertiary)
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(group.restaurant.name.uppercased())
+                            .font(.system(size: 18, weight: .bold))
+                            .tracking(0.5)
+                            .foregroundStyle(Theme.textPrimary)
                             .lineLimit(1)
+
+                        if let subtitle {
+                            Text(subtitle)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Theme.textTertiary)
+                                .lineLimit(1)
+                        }
+                    }
+
+                    Spacer(minLength: 8)
+
+                    if let avg = group.averageScore {
+                        VStack(spacing: 1) {
+                            Text(String(format: "%.1f", avg))
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .foregroundStyle(scoreGradient(avg))
+                                .monospacedDigit()
+                                .shadow(color: scoreColor(avg).opacity(0.4), radius: 12, y: 0)
+                            Text("AVG")
+                                .font(.system(size: 9, weight: .heavy))
+                                .tracking(1.2)
+                                .foregroundStyle(Theme.textTertiary)
+                        }
+                    }
+
+                    if !readOnly {
+                        Color.clear.frame(width: 24, height: 28)
                     }
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
-            Spacer(minLength: 8)
-
-            HStack(alignment: .top, spacing: 6) {
-                if let avg = group.averageScore {
-                    VStack(spacing: 1) {
-                        Text(String(format: "%.1f", avg))
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .foregroundStyle(scoreGradient(avg))
-                            .monospacedDigit()
-                            .shadow(color: scoreColor(avg).opacity(0.4), radius: 12, y: 0)
-                        Text("AVG")
-                            .font(.system(size: 9, weight: .heavy))
-                            .tracking(1.2)
-                            .foregroundStyle(Theme.textTertiary)
-                    }
-                }
-
-                if !readOnly {
-                    Menu {
-                        Button {
-                            onAddDish()
-                        } label: {
-                            Label("Add a dish", systemImage: "plus")
-                        }
-                        Button(role: .destructive) {
-                            onRemoveRestaurant()
-                        } label: {
-                            Label("Remove from list", systemImage: "trash")
-                        }
+            if !readOnly {
+                Menu {
+                    Button {
+                        onAddDish()
                     } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Theme.textTertiary)
-                            .frame(width: 24, height: 28)
-                            .contentShape(Rectangle())
+                        Label("Add a dish", systemImage: "plus")
                     }
+                    Button(role: .destructive) {
+                        onRemoveRestaurant()
+                    } label: {
+                        Label("Remove from list", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Theme.textTertiary)
+                        .frame(width: 24, height: 28)
+                        .contentShape(Rectangle())
                 }
             }
         }

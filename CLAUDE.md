@@ -21,11 +21,16 @@ Backend is in `supabase/` (CLI-linked, project ref `rheqemyqgahwstphguxn`). iOS 
 - Pass to children via `@Bindable var foo: FooViewModel`
 - Free `supabase` global instance from `Services/SupabaseClient.swift`
 
+**Data layer (repositories)**
+- ViewModels do **not** call `supabase.from(...)` directly. All table access goes through one repository per table in `Services/`: `RatingsRepository`, `DishesRepository`, `RestaurantsRepository`, `DishPhotosRepository`, `FollowsRepository`, `ProfilesRepository`. Each is a stateless `struct` with a `.shared` singleton.
+- The repository owns the column list / nested-select string and the decode types, so screens can't drift apart. Add a new query as a method there, don't inline a new `supabase.from(...)` in a ViewModel.
+- `Session.currentUserID()` replaces scattered `supabase.auth.session.user.id`.
+
 **Folder structure**
 - `App/` — entry point, app root, theming
 - `Auth/` — login flow
 - `Features/<Name>/` — one folder per feature, each has its own ViewModel + Views
-- `Services/` — external clients (Supabase, MapKit search)
+- `Services/` — external clients (Supabase, MapKit search) + the repository layer
 - Files inside `gulp/` are auto-included via Xcode 26's `PBXFileSystemSynchronizedRootGroup`. **You don't add files to the project**, just drop them into the folder. Dragging in Xcode doesn't work and is unnecessary.
 
 ## Design language
@@ -71,7 +76,7 @@ Schema lives in the remote Supabase project. The migration in `supabase/migratio
 ```
 Maps to Decodable structs where the nested keys use the FK table name (`dishes`, `restaurants`).
 
-**Soft delete**: never hard-delete a rating. Always set `deleted_at = NOW()`. Filter with `where row.deletedAt == nil` client-side (saves us from learning the Swift SDK's `.is(...)` null syntax).
+**Soft delete**: never hard-delete a rating. Soft-delete goes through `RatingsRepository.softDelete(ids:)`, which calls the `soft_delete_ratings(uuid[])` **SECURITY DEFINER** RPC (migration `20260606160000`). A direct `UPDATE ... SET deleted_at` from the client silently fails on this project (same `user_id = auth.uid()` RLS issue the INSERT hotfix worked around) — the function bypasses RLS but still enforces ownership via `auth.uid()` and returns the affected-row count. Reads filter `where row.deletedAt == nil` client-side as a belt-and-suspenders (the `ratings_select_active` policy already hides deleted rows).
 
 ## Storage
 
