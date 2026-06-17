@@ -54,7 +54,13 @@ class RatingsViewModel {
                 map[r.id]!.ratings.append(row)
             }
 
-            groups = map.values.sorted { $0.restaurant.name < $1.restaurant.name }
+            // Newest first: order restaurants by their most recent rating. Rows
+            // arrive newest-first from the repo, so each group is already sorted
+            // within itself.
+            groups = map.values.sorted {
+                ($0.ratings.map(\.createdAt).max() ?? .distantPast) >
+                ($1.ratings.map(\.createdAt).max() ?? .distantPast)
+            }
         } catch {
             if error.isCancellation { return }
             errorMessage = error.localizedDescription
