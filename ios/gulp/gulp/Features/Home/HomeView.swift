@@ -40,6 +40,7 @@ struct HomeView: View {
                 }
             }
             .refreshable { await viewModel.load() }
+            .tracksTabBarScroll()
         }
         .preferredColorScheme(.dark)
         .toolbar(.hidden, for: .navigationBar)

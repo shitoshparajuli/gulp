@@ -63,6 +63,7 @@ struct RatingsView: View {
                 }
             }
             .refreshable { await viewModel.load(userId: userId) }
+            .if(!readOnly) { $0.tracksTabBarScroll() }
         }
         .preferredColorScheme(.dark)
         .task(id: refreshTrigger) { await viewModel.load(userId: userId) }
