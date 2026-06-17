@@ -32,6 +32,8 @@ final class AddRatingViewModel {
     var newDishCuisine: String = ""
     var selectedPhoto: UIImage?
     var existingPhotoPath: String?
+    var suggestedDishNames: [String] = []
+    var isSuggestingDishes = false
     var score: Int = 8
     var notes: String = ""
     var isWorking = false
@@ -148,6 +150,30 @@ final class AddRatingViewModel {
         existingPhotoPath = nil
     }
 
+    // MARK: - Photo dish-name suggestions
+
+    /// Best-effort: asks the vision Edge Function for likely dish names so the
+    /// dish picker can offer tap-to-fill chips. Failures are swallowed — the
+    /// user can always type the name manually.
+    func suggestDishes(from image: UIImage) async {
+        isSuggestingDishes = true
+        defer { isSuggestingDishes = false }
+
+        do {
+            let names = try await DishRecognitionRepository.shared.suggestNames(
+                image: image,
+                restaurantName: pickedRestaurant?.name,
+                existingDishNames: existingDishes.map(\.displayName)
+            )
+            // Drop the result if the photo was cleared/replaced while we waited.
+            guard selectedPhoto != nil else { return }
+            suggestedDishNames = names
+        } catch {
+            if error.isCancellation { return }
+            // Suggestions are a nice-to-have; stay silent on failure.
+        }
+    }
+
     /// Clears everything specific to the dish just rated so the user can rate
     /// another at the same restaurant. The restaurant selection is intentionally
     /// kept. Synchronous so callers can batch it with the navigation pop (no
@@ -156,6 +182,8 @@ final class AddRatingViewModel {
     func clearForNextDish() {
         selectedPhoto = nil
         existingPhotoPath = nil
+        suggestedDishNames = []
+        isSuggestingDishes = false
         pickedDish = nil
         newDishName = ""
         newDishCuisine = ""

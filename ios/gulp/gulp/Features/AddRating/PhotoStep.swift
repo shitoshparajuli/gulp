@@ -44,8 +44,11 @@ struct PhotoStep: View {
             }
         }
         .fullScreenCover(isPresented: $showCamera) {
-            CameraPicker { viewModel.selectedPhoto = $0 }
-                .ignoresSafeArea()
+            CameraPicker { image in
+                viewModel.selectedPhoto = image
+                suggestDishes(from: image)
+            }
+            .ignoresSafeArea()
         }
         .photosPicker(isPresented: $showLibrary, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in
@@ -54,9 +57,17 @@ struct PhotoStep: View {
                 if let data = try? await item.loadTransferable(type: Data.self),
                    let image = UIImage(data: data) {
                     viewModel.selectedPhoto = image
+                    suggestDishes(from: image)
                 }
             }
         }
+    }
+
+    /// Fire dish-name recognition as soon as a photo is chosen so suggestions
+    /// are ready by the time the user reaches the dish picker.
+    private func suggestDishes(from image: UIImage) {
+        viewModel.suggestedDishNames = []
+        Task { await viewModel.suggestDishes(from: image) }
     }
 
     private var restaurantHeader: some View {
@@ -162,6 +173,7 @@ struct PhotoStep: View {
 
             Button {
                 viewModel.selectedPhoto = nil
+                viewModel.suggestedDishNames = []
                 photoItem = nil
             } label: {
                 Image(systemName: "xmark")
